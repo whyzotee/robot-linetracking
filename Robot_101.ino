@@ -44,7 +44,12 @@ void loop()
   a3_value = analogRead(sensor[3]);
   a4_value = analogRead(sensor[4]);
 
-  // function move(Speed, Direction)
+  /*
+  function move(TestRun, Speed, Direction)
+  Direction Position 0 = Break Move, 1 = Move Front,
+  2 = Move Left, 3 = Move Right, 4 = Move Back,
+  200 = Test Run
+  */
 
   if (isCenter(a0_value, a1_value, a2_value, a3_value, a4_value))
     if (isMove && cross_count < 2)
@@ -62,7 +67,7 @@ void loop()
     {
     case 0:
       Serial.println("Now Robot's Turn Right");
-      move(speed, "right");
+      move(speed, 3);
       delay(500);
       if (a2_value > 200 && a3_value > 200)
       {
@@ -73,7 +78,7 @@ void loop()
       break;
     case 1:
       Serial.println("Now Robot's Turn Left");
-      move(speed, "left");
+      move(speed, 2);
       delay(500);
       if (a1_value > 200 && a2_value > 200)
       {
@@ -107,14 +112,14 @@ bool isCenter(int a0, int a1, int a2, int a3, int a4)
 void balance_move()
 {
   if (a2_value > 200 && isMove)
-    move(speed, "front");
+    move(speed, 1);
   else if (a1_value > 200 && isMove)
-    move(speed, "left");
+    move(speed, 2);
   else if (a3_value > 200 && isMove)
-    move(speed, "right");
+    move(speed, 3);
   else
   {
-    move(speed, "back");
+    move(speed, 4);
     delay(1000);
   }
 }
@@ -134,5 +139,5 @@ void log_sensor()
   Serial.print(" Is Move: ");
   Serial.print(isMove);
   Serial.print(" Center: ");
-  Serial.println(center);
+  Serial.println(cross_count);
 }

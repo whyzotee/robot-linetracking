@@ -17,9 +17,9 @@ void move_setup()
     }
 }
 
-void move(byte speed, char direction[])
+void move(byte speed, byte direction)
 {
-    // Reset Digital Value IntA IntB
+    // Reset Digital Value intA and intB
     reset();
 
     // Set Enable Pin Speed
@@ -28,44 +28,49 @@ void move(byte speed, char direction[])
     analogWrite(backLeft[2], speed);
     analogWrite(backRight[2], speed - 5);
 
+    /*
+    Direction Position 0 = Break Move, 1 = Move Front,
+    2 = Move Left, 3 = Move Right, 4 = Move Back,
+    200 = Test Run
+    */
     switch (direction)
     {
-    case "front":
-        // Move Front
-        digitalWrite(frontLeft[0], 1);
-        digitalWrite(frontRight[1], 1);
-        digitalWrite(backLeft[0], 1);
-        digitalWrite(backRight[1], 1);
-        break;
-    case "left":
-        // Move Left
-        digitalWrite(frontLeft[1], 1);
-        digitalWrite(frontRight[1], 1);
-        digitalWrite(backLeft[1], 1);
-        digitalWrite(backRight[1], 1);
-        break;
-    case "right":
-        // Move Right
-        digitalWrite(frontLeft[0], 1);
-        digitalWrite(frontRight[0], 1);
-        digitalWrite(backLeft[0], 1);
-        digitalWrite(backRight[0], 1);
-        break;
-    case "back":
-        // Move Back
-        digitalWrite(frontLeft[1], 1);
-        digitalWrite(frontRight[0], 1);
-        digitalWrite(backLeft[1], 1);
-        digitalWrite(backRight[0], 1);
-        break;
-    case "break":
+    case 0:
         // Break Move
         analogWrite(frontLeft[2], 0);
         analogWrite(frontRight[2], 0);
         analogWrite(backLeft[2], 0);
         analogWrite(backRight[2], 0);
         break;
-    case 'test':
+    case 1:
+        // Move Front
+        digitalWrite(frontLeft[0], 1);
+        digitalWrite(frontRight[1], 1);
+        digitalWrite(backLeft[0], 1);
+        digitalWrite(backRight[1], 1);
+        break;
+    case 2:
+        // Move Left
+        digitalWrite(frontLeft[1], 1);
+        digitalWrite(frontRight[1], 1);
+        digitalWrite(backLeft[1], 1);
+        digitalWrite(backRight[1], 1);
+        break;
+    case 3:
+        // Move Right
+        digitalWrite(frontLeft[0], 1);
+        digitalWrite(frontRight[0], 1);
+        digitalWrite(backLeft[0], 1);
+        digitalWrite(backRight[0], 1);
+        break;
+    case 4:
+        // Move Back
+        digitalWrite(frontLeft[1], 1);
+        digitalWrite(frontRight[0], 1);
+        digitalWrite(backLeft[1], 1);
+        digitalWrite(backRight[0], 1);
+        break;
+    case 200:
         // Test Run
         digitalWrite(frontLeft[0], 1);
         digitalWrite(frontRight[1], 1);
