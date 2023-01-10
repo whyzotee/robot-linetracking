@@ -2,13 +2,14 @@
 #include <elapsedMillis.h>
 
 // speed_fl, speed_fr, speed_bl, speed_br
-// byte speed[] = {127, 120, 127, 120};
+byte speed[] = {127, 120, 127, 120};
 // test
-byte speed[] = {254, 254, 254, 254};
+// byte speed[] = {255, 255, 255, 255};
 // Sensor tracking position -> { a0  a1  a2  a3  a4 }
 byte sensor[] = {54, 55, 56, 57, 58};
 // Move the Robot
 bool isMove = true;
+bool isTurn = false;
 
 int a0_value, a1_value, a2_value, a3_value, a4_value;
 
@@ -25,12 +26,8 @@ void setup()
   for (byte i = 0; i < 5; i++)
     pinMode(sensor[i], INPUT);
 
-  while (true)
-  {
-    move(false, speed, 1);
-    delay(1000);
-    break;
-  }
+  move(false, speed, 1);
+  delay(1000);
 }
 
 void loop()
@@ -63,106 +60,70 @@ void loop()
   //     Serial.println("OFF");
   //   }
   // }
-  if (a0_value > 200 && a1_value > 200 && a2_value > 200 && a3_value > 200 && a4_value > 200 && isMove && center <= 2)
+
+  if (isCenter(a0_value, a1_value, a2_value, a3_value, a4_value) && isMove && center < 2)
+    isTurn = true;
+
+  if (isTurn)
   {
     delay(500);
-    while (center == 1)
-    {
-      move(false, speed, 2);
-      delay(1000);
-
-      if (a1_value > 200 && a2_value > 200)
-      {
-        center += 1;
-        break;
-      }
-    }
-
-    while (center == 0)
+    if (center == 0)
     {
       move(false, speed, 3);
       delay(1000);
-
-      if (a3_value > 200 && a2_value > 200)
+      if (a2_value > 200 && a3_value > 200)
       {
-        center += 1;
-        break;
+        // center += 1;
+        isTurn = false;
+      }
+    }
+    else if (center == 1)
+    {
+      move(false, speed, 2);
+      delay(500);
+
+      if (a1_value > 200 && a2_value > 200)
+      {
+        // center += 1;
+        isTurn = false;
       }
     }
   }
 
-  // if (a0_value > 200 && a1_value > 200 && a2_value > 200 && a3_value > 200 && a4_value > 200 && isMove)
+  // if (a2_value > 200 && a3_value > 200 && a4_value > 200 && isMove && center >= 2)
   // {
-  //   // move(false, speed, 101);
-  //   // delay(500);
-  //   // center += 1;
-  //   move(false, speed, 1);
-  //   delay(700);
   //   while (true)
   //   {
   //     move(false, speed, 2);
-  //     // a1_value < 200 || a3_value < 200
-  //     if (a2_value > 200 || a1_value > 200)
+  //     delay(1000);
+
+  //     if (a1_value > 200 && a2_value > 200)
   //     {
-  //       delay(1500);
+  //       center += 1;
   //       break;
   //     }
   //   }
   // }
 
-  // if (a0_value > 200 && a1_value > 200 && a2_value && isMove)
-  // {
-  //   move(false, speed, 1);
-  //   delay(1200);
-  //   while (true)
-  //   {
-  //     move(false, speed, 2);
-  //     // a1_value < 200 || a3_value < 200
-  //     if (a2_value > 200 || a1_value > 200)
-  //     {
-  //       delay(1300);
-  //       break;
-  //     }
-  //   }
-  // }
-
-  // if (a0_value > 200 && a1_value > 200 && a2_value > 200 && isMove)
-  // {
-  //   while (true)
-  //   {
-  //     move(false, speed, 4);
-  //     if (a0_value > 200 && a1_value > 200 && a2_value > 200 && a3_value > 200 && a4_value > 200 && isMove)
-  //     {
-  //       delay(1000);
-  //       break;
-  //     }
-  //   }
-  // }
-
-  if (a2_value > 200 && isMove)
+  if (!isTurn)
   {
-    move(false, speed, 1);
-  }
-  else if (a1_value > 200 && isMove)
-  {
-    move(false, speed, 2);
-  }
-  else if (a3_value > 200 && isMove)
-  {
-    move(false, speed, 3);
-  }
-  // else if (a0_value > 200 && isMove)
-  // {
-  //   move(false, speed, 3);
-  // }
-  // else if (a4_value > 200 && isMove)
-  // {
-  //   move(false, speed, 2);
-  // }
-  else
-  {
-    move(false, speed, 101);
-    delay(1000);
+    if (a2_value > 200 && isMove)
+    {
+      move(false, speed, 1);
+    }
+    else if (a1_value > 200 && isMove)
+    {
+      move(false, speed, 2);
+    }
+    else if (a3_value > 200 && isMove)
+    {
+      move(false, speed, 3);
+    }
+    else
+    {
+      move(false, speed, 101);
+      delay(1000);
+    }
   }
 
   Serial.print("A0: ");
@@ -180,5 +141,13 @@ void loop()
   Serial.print(" Center: ");
   Serial.println(center);
 
-  delay(30);
+  delay(50);
+}
+
+bool isCenter(int a0, int a1, int a2, int a3, int a4)
+{
+  if (a0 > 200 && a1 > 200 && a2 > 200 && a3 > 200 && a4 > 200)
+    return true;
+  else
+    return false;
 }
