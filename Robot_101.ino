@@ -3,18 +3,25 @@
 
 // speed_fl, speed_fr, speed_bl, speed_br
 byte speed[] = {127, 120, 127, 120};
-// test
+
+// Full Spped
 // byte speed[] = {255, 255, 255, 255};
+
 // Sensor tracking position -> { a0  a1  a2  a3  a4 }
 byte sensor[] = {54, 55, 56, 57, 58};
+
+// Sensor Value
+byte a0_value, a1_value, a2_value, a3_value, a4_value;
+
 // Move the Robot
 bool isMove = true;
-bool isTurn = false;
 
-int a0_value, a1_value, a2_value, a3_value, a4_value;
+// Robot is Turning Left or Right
+bool isTurn = false;
 
 byte center = 0;
 
+// Test Out loop Delay Time
 elapsedMillis x;
 
 void setup()
@@ -26,19 +33,13 @@ void setup()
   for (byte i = 0; i < 5; i++)
     pinMode(sensor[i], INPUT);
 
+  // Move Out Start Point
   move(false, speed, 1);
   delay(1000);
 }
 
 void loop()
 {
-  // move(TestRun, Speed, Direction)
-  // Direction Position 1 = Move Front, 2 = Move Left
-  // 3 = Move Right, 4 = Move Back, 101 = Break Move
-
-  // Test Run
-  // move(true, speed, 0);
-
   a0_value = analogRead(sensor[0]);
   a1_value = analogRead(sensor[1]);
   a2_value = analogRead(sensor[2]);
@@ -60,6 +61,13 @@ void loop()
   //     Serial.println("OFF");
   //   }
   // }
+
+  /*
+  function move(TestRun, Speed, Direction)
+  Direction Position 1 = Move Front, 2 = Move Left
+  3 = Move Right, 4 = Move Back, 101 = Break Move,
+  404 = Test Run
+  */
 
   if (isCenter(a0_value, a1_value, a2_value, a3_value, a4_value) && isMove && center < 2)
     isTurn = true;
@@ -90,41 +98,8 @@ void loop()
     }
   }
 
-  // if (a2_value > 200 && a3_value > 200 && a4_value > 200 && isMove && center >= 2)
-  // {
-  //   while (true)
-  //   {
-  //     move(false, speed, 2);
-  //     delay(1000);
-
-  //     if (a1_value > 200 && a2_value > 200)
-  //     {
-  //       center += 1;
-  //       break;
-  //     }
-  //   }
-  // }
-
   if (!isTurn)
-  {
-    if (a2_value > 200 && isMove)
-    {
-      move(false, speed, 1);
-    }
-    else if (a1_value > 200 && isMove)
-    {
-      move(false, speed, 2);
-    }
-    else if (a3_value > 200 && isMove)
-    {
-      move(false, speed, 3);
-    }
-    else
-    {
-      move(false, speed, 101);
-      delay(1000);
-    }
-  }
+    move_forward();
 
   Serial.print("A0: ");
   Serial.print(a0_value);
@@ -150,4 +125,25 @@ bool isCenter(int a0, int a1, int a2, int a3, int a4)
     return true;
   else
     return false;
+}
+
+void move_forward()
+{
+  if (a2_value > 200 && isMove)
+  {
+    move(false, speed, 1);
+  }
+  else if (a1_value > 200 && isMove)
+  {
+    move(false, speed, 2);
+  }
+  else if (a3_value > 200 && isMove)
+  {
+    move(false, speed, 3);
+  }
+  else
+  {
+    move(false, speed, 101);
+    delay(1000);
+  }
 }

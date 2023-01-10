@@ -19,40 +19,9 @@ void move_setup()
     }
 }
 
-void move(bool runTest, byte speed[], int direction)
+void move(byte speed[], int direction)
 {
     reset();
-
-    // run Test Wheel
-    while (runTest)
-    {
-        analogWrite(frontLeft[2], speed[0]);
-        analogWrite(frontRight[2], speed[1]);
-        analogWrite(backLeft[2], speed[2]);
-        analogWrite(backRight[2], speed[3]);
-
-        digitalWrite(frontLeft[1], 0);
-        digitalWrite(frontRight[0], 0);
-        digitalWrite(backLeft[1], 0);
-        digitalWrite(backRight[0], 0);
-
-        digitalWrite(frontLeft[0], 1);
-        digitalWrite(frontRight[1], 1);
-        digitalWrite(backLeft[0], 1);
-        digitalWrite(backRight[1], 1);
-        delay(1000);
-
-        digitalWrite(frontLeft[0], 0);
-        digitalWrite(frontRight[1], 0);
-        digitalWrite(backLeft[0], 0);
-        digitalWrite(backRight[1], 0);
-
-        digitalWrite(frontLeft[1], 1);
-        digitalWrite(frontRight[0], 1);
-        digitalWrite(backLeft[1], 1);
-        digitalWrite(backRight[0], 1);
-        delay(1000);
-    }
 
     analogWrite(frontLeft[2], speed[0]);
     analogWrite(frontRight[2], speed[1]);
@@ -95,11 +64,37 @@ void move(bool runTest, byte speed[], int direction)
         analogWrite(backLeft[2], 0);
         analogWrite(backRight[2], 0);
         break;
-    default:
+    case 404:
+        analogWrite(frontLeft[2], speed[0]);
+        analogWrite(frontRight[2], speed[1]);
+        analogWrite(backLeft[2], speed[2]);
+        analogWrite(backRight[2], speed[3]);
+
+        digitalWrite(frontLeft[1], 0);
+        digitalWrite(frontRight[0], 0);
+        digitalWrite(backLeft[1], 0);
+        digitalWrite(backRight[0], 0);
+
+        digitalWrite(frontLeft[0], 1);
+        digitalWrite(frontRight[1], 1);
+        digitalWrite(backLeft[0], 1);
+        digitalWrite(backRight[1], 1);
+        delay(1000);
+
+        digitalWrite(frontLeft[0], 0);
+        digitalWrite(frontRight[1], 0);
+        digitalWrite(backLeft[0], 0);
+        digitalWrite(backRight[1], 0);
+
+        digitalWrite(frontLeft[1], 1);
+        digitalWrite(frontRight[0], 1);
+        digitalWrite(backLeft[1], 1);
+        digitalWrite(backRight[0], 1);
+        delay(1000);
         break;
     }
 
-    delay(100);
+    delay(50);
 }
 
 void reset()
