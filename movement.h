@@ -5,7 +5,7 @@
 #include <elapsedMillis.h>
 
 void move_setup();
-void move(byte speed[], int direction);
+void move(byte speed, char direction[]);
 void reset();
 
 #endif

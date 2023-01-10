@@ -1,25 +1,23 @@
 #include "movement.h"
 #include <elapsedMillis.h>
 
-// speed_fl, speed_fr, speed_bl, speed_br
-byte speed[] = {127, 120, 127, 120};
+// Extend To Array { speed, speed - 5, speed, speed - 5} max value's 255
+byte speed = 127;
 
-// Full Spped
-// byte speed[] = {255, 255, 255, 255};
-
-// Sensor tracking position -> { a0  a1  a2  a3  a4 }
+// Sensor Tracking Position -> { a0  a1  a2  a3  a4 }
 byte sensor[] = {54, 55, 56, 57, 58};
 
 // Sensor Value
 byte a0_value, a1_value, a2_value, a3_value, a4_value;
 
-// Move the Robot
+// Check Move the Robot
 bool isMove = true;
 
-// Robot is Turning Left or Right
+// Check Robot's Turning Left or Right
 bool isTurn = false;
 
-byte center = 0;
+// Check How Many Robot Go to Crossroad
+byte cross_count = 0;
 
 // Test Out loop Delay Time
 elapsedMillis x;
@@ -33,8 +31,8 @@ void setup()
   for (byte i = 0; i < 5; i++)
     pinMode(sensor[i], INPUT);
 
-  // Move Out Start Point
-  move(false, speed, 1);
+  // Move Out From Start Point
+  move(speed, "front");
   delay(1000);
 }
 
@@ -46,61 +44,83 @@ void loop()
   a3_value = analogRead(sensor[3]);
   a4_value = analogRead(sensor[4]);
 
-  // if (Serial.available())
-  // {
-  //   isMove = Serial.read();
+  // function move(Speed, Direction)
 
-  //   if (isMove = 1)
-  //   {
-  //     isMove = true;
-  //     Serial.println("ON");
-  //   }
-  //   if (isMove = 0)
-  //   {
-  //     isMove = false;
-  //     Serial.println("OFF");
-  //   }
-  // }
-
-  /*
-  function move(TestRun, Speed, Direction)
-  Direction Position 1 = Move Front, 2 = Move Left
-  3 = Move Right, 4 = Move Back, 101 = Break Move,
-  404 = Test Run
-  */
-
-  if (isCenter(a0_value, a1_value, a2_value, a3_value, a4_value) && isMove && center < 2)
-    isTurn = true;
+  if (isCenter(a0_value, a1_value, a2_value, a3_value, a4_value))
+    if (isMove && cross_count < 2)
+    {
+      isTurn = true;
+      isMove = false;
+    }
 
   if (isTurn)
   {
+    Serial.println("Turning Now!");
     delay(500);
-    if (center == 0)
+
+    switch (cross_count)
     {
-      move(false, speed, 3);
-      delay(1000);
+    case 0:
+      Serial.println("Now Robot's Turn Right");
+      move(speed, "right");
+      delay(500);
       if (a2_value > 200 && a3_value > 200)
       {
-        // center += 1;
+        cross_count += 1;
         isTurn = false;
+        isMove = true;
       }
-    }
-    else if (center == 1)
-    {
-      move(false, speed, 2);
+      break;
+    case 1:
+      Serial.println("Now Robot's Turn Left");
+      move(speed, "left");
       delay(500);
-
       if (a1_value > 200 && a2_value > 200)
       {
-        // center += 1;
+        // cross_count += 1;
         isTurn = false;
+        isMove = true;
       }
+      break;
+    default:
+      break;
     }
   }
 
   if (!isTurn)
-    move_forward();
+  {
+    balance_move();
+    log_sensor();
+  }
 
+  delay(50);
+}
+
+bool isCenter(int a0, int a1, int a2, int a3, int a4)
+{
+  if (a0 > 200 && a1 > 200 && a2 > 200 && a3 > 200 && a4 > 200)
+    return true;
+  else
+    return false;
+}
+
+void balance_move()
+{
+  if (a2_value > 200 && isMove)
+    move(speed, "front");
+  else if (a1_value > 200 && isMove)
+    move(speed, "left");
+  else if (a3_value > 200 && isMove)
+    move(speed, "right");
+  else
+  {
+    move(speed, "back");
+    delay(1000);
+  }
+}
+
+void log_sensor()
+{
   Serial.print("A0: ");
   Serial.print(a0_value);
   Serial.print(" A1: ");
@@ -115,35 +135,4 @@ void loop()
   Serial.print(isMove);
   Serial.print(" Center: ");
   Serial.println(center);
-
-  delay(50);
-}
-
-bool isCenter(int a0, int a1, int a2, int a3, int a4)
-{
-  if (a0 > 200 && a1 > 200 && a2 > 200 && a3 > 200 && a4 > 200)
-    return true;
-  else
-    return false;
-}
-
-void move_forward()
-{
-  if (a2_value > 200 && isMove)
-  {
-    move(false, speed, 1);
-  }
-  else if (a1_value > 200 && isMove)
-  {
-    move(false, speed, 2);
-  }
-  else if (a3_value > 200 && isMove)
-  {
-    move(false, speed, 3);
-  }
-  else
-  {
-    move(false, speed, 101);
-    delay(1000);
-  }
 }
