@@ -2,13 +2,13 @@
 #include <elapsedMillis.h>
 
 // Extend To Array { speed, speed - 5, speed, speed - 5} max value's 255
-byte speed = 127;
+byte speed = 255;
 
 // Sensor Tracking Position -> { a0  a1  a2  a3  a4 }
 byte sensor[] = {54, 55, 56, 57, 58};
 
 // Sensor Value
-byte a0_value, a1_value, a2_value, a3_value, a4_value;
+int a0_value, a1_value, a2_value, a3_value, a4_value;
 
 // Check Move the Robot
 bool isMove = true;
@@ -16,11 +16,14 @@ bool isMove = true;
 // Check Robot's Turning Left or Right
 bool isTurn = false;
 
+bool checksome = false;
 // Check How Many Robot Go to Crossroad
 byte cross_count = 0;
 
-// Test Out loop Delay Time
-elapsedMillis x;
+// Delay Time
+unsigned long prevTime = millis();
+unsigned long logTime = 0;
+// unsigned long y, z = 0;
 
 void setup()
 {
@@ -32,8 +35,8 @@ void setup()
     pinMode(sensor[i], INPUT);
 
   // Move Out From Start Point
-  move(speed, "front");
-  delay(1000);
+  move(speed, 1);
+  delay(500);
 }
 
 void loop()
@@ -44,6 +47,7 @@ void loop()
   a3_value = analogRead(sensor[3]);
   a4_value = analogRead(sensor[4]);
 
+  unsigned long currentTime = millis();
   /*
   function move(TestRun, Speed, Direction)
   Direction Position 0 = Break Move, 1 = Move Front,
@@ -51,59 +55,63 @@ void loop()
   200 = Test Run
   */
 
-  if (isCenter(a0_value, a1_value, a2_value, a3_value, a4_value))
+  if (isCenter())
+  {
     if (isMove && cross_count < 2)
-    {
-      isTurn = true;
       isMove = false;
-    }
+  }
+
+  if (isMove == false && isTurn == false)
+  {
+    if (prevTime == 0)
+      prevTime = currentTime;
+
+    if (currentTime - prevTime > 1000)
+      isTurn = true;
+  }
 
   if (isTurn)
   {
-    Serial.println("Turning Now!");
-    delay(500);
-
     switch (cross_count)
     {
     case 0:
-      Serial.println("Now Robot's Turn Right");
       move(speed, 3);
-      delay(500);
-      if (a2_value > 200 && a3_value > 200)
+      if (a3_value > 200 && a2_value > 200)
       {
         cross_count += 1;
-        isTurn = false;
         isMove = true;
+        isTurn = false;
+        prevTime = 0;
       }
       break;
     case 1:
-      Serial.println("Now Robot's Turn Left");
       move(speed, 2);
-      delay(500);
       if (a1_value > 200 && a2_value > 200)
       {
-        // cross_count += 1;
-        isTurn = false;
+        cross_count += 1;
         isMove = true;
+        isTurn = false;
+        prevTime = 0;
       }
-      break;
-    default:
-      break;
     }
   }
 
-  if (!isTurn)
+  if (isMove == true && isTurn == false)
   {
     balance_move();
-    log_sensor();
+    if (currentTime - logTime > 1000)
+    {
+      log_sensor();
+      logTime = currentTime;
+    }
   }
 
   delay(50);
 }
 
-bool isCenter(int a0, int a1, int a2, int a3, int a4)
+bool isCenter()
 {
-  if (a0 > 200 && a1 > 200 && a2 > 200 && a3 > 200 && a4 > 200)
+  if (a0_value > 200 && a1_value > 200 && a2_value > 200 && a3_value > 200 && a4_value > 200)
     return true;
   else
     return false;
@@ -119,8 +127,8 @@ void balance_move()
     move(speed, 3);
   else
   {
-    move(speed, 4);
-    delay(1000);
+    move(speed, 0);
+    isMove = false;
   }
 }
 
