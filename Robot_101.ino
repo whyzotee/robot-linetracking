@@ -1,5 +1,4 @@
 #include "movement.h"
-#include <elapsedMillis.h>
 
 // Extend To Array { speed, speed - 5, speed, speed - 5} max value's 255
 byte speed = 255;
@@ -21,9 +20,9 @@ bool checksome = false;
 byte cross_count = 0;
 
 // Delay Time
-unsigned long prevTime = millis();
+unsigned long prevTime = 0;
 unsigned long logTime = 0;
-// unsigned long y, z = 0;
+unsigned long delayCenter = 0;
 
 void setup()
 {
@@ -32,7 +31,9 @@ void setup()
   move_setup();
 
   for (byte i = 0; i < 5; i++)
+  {
     pinMode(sensor[i], INPUT);
+  }
 
   // Move Out From Start Point
   move(speed, 1);
@@ -47,7 +48,9 @@ void loop()
   a3_value = analogRead(sensor[3]);
   a4_value = analogRead(sensor[4]);
 
+  // CurrentTimeLine
   unsigned long currentTime = millis();
+
   /*
   function move(TestRun, Speed, Direction)
   Direction Position 0 = Break Move, 1 = Move Front,
@@ -58,16 +61,22 @@ void loop()
   if (isCenter())
   {
     if (isMove && cross_count < 2)
+    {
       isMove = false;
+    }
   }
 
-  if (isMove == false && isTurn == false)
+  if (!isMove && !isTurn)
   {
     if (prevTime == 0)
+    {
       prevTime = currentTime;
+    }
 
-    if (currentTime - prevTime > 1000)
+    if (currentTime - prevTime > 500)
+    {
       isTurn = true;
+    }
   }
 
   if (isTurn)
@@ -76,22 +85,40 @@ void loop()
     {
     case 0:
       move(speed, 3);
-      if (a3_value > 200 && a2_value > 200)
+
+      if (delayCenter == 0)
       {
-        cross_count += 1;
-        isMove = true;
-        isTurn = false;
-        prevTime = 0;
+        delayCenter = currentTime;
+      }
+      if (currentTime - delayCenter > 250)
+      {
+        if (a3_value > 200 || a2_value > 200)
+        {
+          cross_count += 1;
+          isMove = true;
+          isTurn = false;
+          prevTime = 0;
+          delayCenter = 0;
+        }
       }
       break;
     case 1:
       move(speed, 2);
-      if (a1_value > 200 && a2_value > 200)
+
+      if (delayCenter == 0)
       {
-        cross_count += 1;
-        isMove = true;
-        isTurn = false;
-        prevTime = 0;
+        delayCenter = currentTime;
+      }
+      if (currentTime - delayCenter > 800)
+      {
+        if (a1_value > 200 || a2_value > 200)
+        {
+          cross_count += 1;
+          isMove = true;
+          isTurn = false;
+          prevTime = 0;
+          delayCenter = 0;
+        }
       }
     }
   }
@@ -99,36 +126,47 @@ void loop()
   if (isMove == true && isTurn == false)
   {
     balance_move();
-    if (currentTime - logTime > 1000)
+    if (currentTime - logTime > 500)
     {
       log_sensor();
       logTime = currentTime;
     }
   }
-
-  delay(50);
+  delay(30);
 }
 
 bool isCenter()
 {
-  if (a0_value > 200 && a1_value > 200 && a2_value > 200 && a3_value > 200 && a4_value > 200)
+  if (a0_value > 400 && a1_value > 400 && a2_value > 400 && a3_value > 400 && a4_value > 400)
+  {
     return true;
+  }
   else
+  {
     return false;
+  }
 }
 
 void balance_move()
 {
-  if (a2_value > 200 && isMove)
+  if (a2_value > 250 && isMove)
+  {
     move(speed, 1);
-  else if (a1_value > 200 && isMove)
+  }
+
+  else if (a1_value > 250 && isMove)
+  {
     move(speed, 2);
-  else if (a3_value > 200 && isMove)
+  }
+
+  else if (a3_value > 250 && isMove)
+  {
     move(speed, 3);
+  }
   else
   {
     move(speed, 0);
-    isMove = false;
+    // isMove = false;
   }
 }
 
