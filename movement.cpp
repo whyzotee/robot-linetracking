@@ -17,6 +17,18 @@ void move_setup()
     }
 }
 
+void reset()
+{
+    digitalWrite(frontLeft[0], 0);
+    digitalWrite(frontRight[0], 0);
+    digitalWrite(backLeft[0], 0);
+    digitalWrite(backRight[0], 0);
+    digitalWrite(frontLeft[1], 0);
+    digitalWrite(frontRight[1], 0);
+    digitalWrite(backLeft[1], 0);
+    digitalWrite(backRight[1], 0);
+}
+
 void move(byte speed, byte direction)
 {
     // Reset Digital Value intA and intB
@@ -33,44 +45,49 @@ void move(byte speed, byte direction)
     2 = Move Left, 3 = Move Right, 4 = Move Back,
     200 = Test Run
     */
-    switch (direction)
+    if (direction == 0)
     {
-    case 0:
         // Break Move
         analogWrite(frontLeft[2], 0);
         analogWrite(frontRight[2], 0);
         analogWrite(backLeft[2], 0);
         analogWrite(backRight[2], 0);
-        break;
-    case 1:
+    }
+    else if (direction == 1)
+    {
         // Move Front
         digitalWrite(frontLeft[0], 1);
         digitalWrite(frontRight[1], 1);
         digitalWrite(backLeft[0], 1);
         digitalWrite(backRight[1], 1);
-        break;
-    case 2:
+    }
+    else if (direction == 2)
+    {
         // Move Left
         digitalWrite(frontLeft[1], 1);
         digitalWrite(frontRight[1], 1);
-        digitalWrite(backLeft[1], 1);
-        digitalWrite(backRight[1], 1);
-        break;
-    case 3:
-        // Move Right
-        digitalWrite(frontLeft[0], 1);
-        digitalWrite(frontRight[0], 1);
         digitalWrite(backLeft[0], 1);
         digitalWrite(backRight[0], 1);
-        break;
-    case 4:
-        // Move Back
-        digitalWrite(frontLeft[1], 1);
+    }
+    else if (direction == 3)
+    {
+        // Move Right
+
+        digitalWrite(frontLeft[0], 1);
         digitalWrite(frontRight[0], 1);
         digitalWrite(backLeft[1], 1);
-        digitalWrite(backRight[0], 1);
-        break;
-    case 200:
+        digitalWrite(backRight[1], 1);
+    }
+    else if (direction == 4)
+    {
+        // Move Front
+        digitalWrite(frontLeft[0], 1);
+        digitalWrite(frontRight[1], 1);
+        digitalWrite(backLeft[0], 1);
+        digitalWrite(backRight[1], 1);
+    }
+    else
+    {
         // Test Run
         digitalWrite(frontLeft[0], 1);
         digitalWrite(frontRight[1], 1);
@@ -83,20 +100,7 @@ void move(byte speed, byte direction)
         digitalWrite(backLeft[1], 1);
         digitalWrite(backRight[0], 1);
         delay(1000);
-        break;
     }
 
     delay(50);
-}
-
-void reset()
-{
-    digitalWrite(frontLeft[0], 0);
-    digitalWrite(frontRight[0], 0);
-    digitalWrite(backLeft[0], 0);
-    digitalWrite(backRight[0], 0);
-    digitalWrite(frontLeft[1], 0);
-    digitalWrite(frontRight[1], 0);
-    digitalWrite(backLeft[1], 0);
-    digitalWrite(backRight[1], 0);
 }
