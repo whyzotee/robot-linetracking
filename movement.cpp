@@ -6,6 +6,8 @@ const byte frontRight[] = {10, 9, 8};
 const byte backLeft[] = {7, 6, 5};
 const byte backRight[] = {4, 3, 2};
 
+String old_direction = "";
+
 void move_setup()
 {
     for (int i = 0; i < 3; i++)
@@ -31,13 +33,13 @@ void reset()
 
 void move(byte speed, String direction)
 {
-    // Reset Digital Value intA and intB
-    String old_direction;
-    if (old_direction != direction)
-    {
-        reset();
-        old_direction = direction;
-    }
+    // // Reset Digital Value intA and intB
+    // if (old_direction != direction)
+    // {
+    //     Serial.print(direction);
+    //     old_direction = direction;
+    // }
+    reset();
 
     // Set Enable Pin Speed
     analogWrite(frontLeft[2], speed);
@@ -71,17 +73,16 @@ void move(byte speed, String direction)
         // Move Left
         digitalWrite(frontLeft[1], 1);
         digitalWrite(frontRight[1], 1);
-        digitalWrite(backLeft[0], 1);
-        digitalWrite(backRight[0], 1);
+        digitalWrite(backLeft[1], 1);
+        digitalWrite(backRight[1], 1);
     }
     else if (direction == "right")
     {
         // Move Right
-
         digitalWrite(frontLeft[0], 1);
         digitalWrite(frontRight[0], 1);
-        digitalWrite(backLeft[1], 1);
-        digitalWrite(backRight[1], 1);
+        digitalWrite(backLeft[0], 1);
+        digitalWrite(backRight[0], 1);
     }
     else if (direction == "back")
     {
@@ -106,6 +107,4 @@ void move(byte speed, String direction)
         digitalWrite(backRight[0], 1);
         delay(1000);
     }
-
-    delay(50);
 }

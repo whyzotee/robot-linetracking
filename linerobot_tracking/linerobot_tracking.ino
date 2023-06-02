@@ -13,25 +13,22 @@ byte sensor_front[] = { 54, 55, 56, 57, 58 };
 byte sensor_center[] = { 60, 0, 61, 59, 63 };
 
 // Sensor Value
-int a0_value, a1_value, a2_value, a3_value, a4_value;
-int a5_value, a6_value, a7_value, a8_value, a9_value;
+short a0_value, a1_value, a2_value, a3_value, a4_value;
+short a5_value, a6_value, a7_value, a8_value, a9_value;
 
 bool isMove = true;
 bool isBack = false;
+bool isSoi = false;
+bool fake_left = false;
 
 // Delay Time
-unsigned long prevTime = 0;
 unsigned long logTime = 0;
 unsigned long delayTurn = 0;
-
-// Variables for PID control
-double integral = 0.0;
-double previousError = 0.0;
+unsigned long delaybeforeTurn = 0;
 
 int cross = 0;
-int left_count = 0;
-int object = 0;
-
+int right_count = 0;
+int soi_count = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -49,18 +46,7 @@ void setup() {
 }
 
 void loop() {
-  a0_value = analogRead(sensor_front[0]);
-  a1_value = analogRead(sensor_front[1]);
-  a2_value = analogRead(sensor_front[2]);
-  a3_value = analogRead(sensor_front[3]);
-  a4_value = analogRead(sensor_front[4]);
-  
-  
-  a5_value = analogRead(sensor_center[0]);
-  a6_value = analogRead(sensor_center[1]);
-  a7_value = analogRead(sensor_center[2]);
-  a8_value = analogRead(sensor_center[3]);
-  a9_value = analogRead(sensor_center[4]);
+  sensor_read();
 
   // CurrentTimeLine
   unsigned long currentTime = millis();
@@ -68,62 +54,111 @@ void loop() {
   if (isMove) {
     if (!isBack)
       balance_move();
-    if (isBack)
+    else
       balance_move_back();
   }
 
+
   if (!isMove) {
-    if (cross == 1 || cross == 2) {
+    if (cross == 0) {
       if (currentTime - delayTurn > 800) {
         if (a2_value > black_value || a3_value > black_value) {
           isMove = true;
           delayTurn = 0;
+          cross += 1;
         }
       }
       move(speed, "left");
+    } else if (cross == 1) {
+      // if (currentTime - delayTurn > 1000) {
+      //   if (a2_value > black_value || a3_value > black_value) {
+      //     if(right_count == 0) {
+      //       isMove = true;
+      //       delayTurn = 0;
+      //     }
+      //   }
+      // }
+      // move(speed, "left");
+      while (true) {
+        sensor_read();
+        move(speed, "left");
+        if (a2_value > black_value && a3_value > black_value) {
+          if (fake_left) {
+            isMove = true;
+            delayTurn = 0;
+            cross += 1;
+            break;
+          }
+          fake_left = true;
+          delay(50);
+        }
+      }
     }
-    if (cross == 6) {
+
+    if (right_count == 4 && soi_count == 0) {
       if (currentTime - delayTurn > 800) {
         if (a2_value > black_value || a3_value > black_value) {
+          isSoi = true;
           isMove = true;
           delayTurn = 0;
         }
       }
       move(speed, "right");
     }
+
+    if (soi_count == 1) {
+      if (currentTime - delayTurn > 800) {
+        if (a2_value > black_value || a3_value > black_value) {
+          isMove = true;
+          delayTurn = 0;
+        }
+      }
+      Serial.println(currentTime - delayTurn > 800);
+
+      move(speed, "right");
+    }
+  }
+
+  if (soi_count == 1 && isMove) {
+    if (a1_value > black_value || a2_value > black_value || a3_value > black_value) {
+      delay(500);
+      if (delayTurn == 0) {
+        isMove = false;
+        delayTurn = currentTime;
+      }
+    }
+  }
+
+  // เลี้ยวเข้าซอยสุดท้าย
+  if (cross == 2 && right_count <= 4) {
+    if (a2_value > black_value && a3_value > black_value && a4_value > black_value) {
+      right_count += 1;
+      if (right_count == 4 && delayTurn == 0) {
+        if (delayTurn == 0) {
+          delay(500);
+          isMove = false;
+          delayTurn = currentTime;
+        }
+      }
+    }
   }
 
   if (isCenter()) {
-    if (cross == 0 && delayTurn == 0) {
-      // delay(500);
-      Serial.println("ok");
+    if (cross == 0) {
+      delay(500);
       isMove = false;
       delayTurn = currentTime;
-      cross += 1;
-    } else if (cross == 1 && delayTurn == 0) {
-      // delay(500);
+    } else if (cross == 1) {
+      delay(300);
       if (delayTurn == 0) {
         isMove = false;
         delayTurn = currentTime;
-        cross += 1;
       }
     }
-  }
-
-  if (a2_value > black_value && a3_value > black_value && a4_value > black_value) {
-    if (cross == 6 && delayTurn == 0) {
-      // delay(500);
-      if (delayTurn == 0) {
-        isMove = false;
-        delayTurn = currentTime;
-        cross += 1;
-      }
-    }
-    cross += 1;
   }
 
   if (currentTime - logTime > 250) {
-    log_sensor();
+    //log_sensor();
     logTime = currentTime;
   }
 
@@ -131,8 +166,7 @@ void loop() {
 }
 
 bool isCenter() {
-  return (a5_value > black_value && a7_value > black_value && a9_value > black_value);
-  //return (a0_value && a1_value && a2_value && a3_value && a4_value);
+  return (a0_value > black_value && a1_value > black_value && a2_value > black_value && a3_value > black_value && a4_value > black_value);
 }
 
 void balance_move() {
@@ -143,29 +177,89 @@ void balance_move() {
     move(speed, "left");
   } else if (a3_value > black_value || a4_value > black_value) {
     move(speed, "right");
-  
   } else {
-    move(0, "stop");
-    isMove = false;
+    if (isSoi) {
+      move(0, "stop");
+      delay(1000);
+      move(speed, "back");
+      delay(500);
+      isBack = true;
+    } else {
+      move(0, "stop");
+    }
   }
 }
 
 void balance_move_back() {
-  // Apply the control output to the movement
+  while (isSoi) {
+    sensor_read();
+    if (a2_value > black_value) {
+      move(speed, "back");
+    } else if (a1_value > black_value) {
+      move(speed, "right");
+      delay(100);
+      move(speed, "back");
+      delay(100);
+    } else if (a3_value > black_value) {
+      move(speed, "left");
+      delay(100);
+      move(speed, "back");
+      delay(100);
+    } else if (a0_value > black_value) {
+      move(speed, "left");
+      delay(100);
+      move(speed, "back");
+      delay(100);
+    } else if (a4_value > black_value) {
+      move(speed, "right");
+      delay(100);
+      move(speed, "back");
+      delay(100);
+    } else {
+      move(speed, "front");
+      delay(300);
+      isSoi = false;
+      isBack = false;
+      soi_count += 1;
+      break;
+    }
+    delay(50);
+  }
+
   if (a2_value > black_value) {
     move(speed, "back");
-  } else if (a0_value > black_value && a1_value > black_value) {
-    move(speed, "left");
-  } else if (a3_value > black_value && a4_value > black_value) {
-    move(speed, "right");
+    Serial.println("real back");
+  } else if (a1_value > black_value) {
+    move(speed, "back_right");
+    delay(100);
+    move(speed, "back");
+    delay(100);
+  } else if (a3_value > black_value) {
+    move(speed, "back_left");
+    delay(100);
+    move(speed, "back");
+    delay(100);
   } else if (a0_value > black_value) {
-    move(speed, "left");
+    move(speed, "back_left");
+    delay(100);
+    move(speed, "back");
+    delay(100);
   } else if (a4_value > black_value) {
-    move(speed, "right");
+    move(speed, "back_right");
+    delay(100);
+    move(speed, "back");
+    delay(100);
   } else {
     move(0, "stop");
-    isMove = false;
   }
+}
+
+void sensor_read() {
+  a0_value = analogRead(sensor_front[0]);
+  a1_value = analogRead(sensor_front[1]);
+  a2_value = analogRead(sensor_front[2]);
+  a3_value = analogRead(sensor_front[3]);
+  a4_value = analogRead(sensor_front[4]);
 }
 
 void log_sensor() {
@@ -180,16 +274,11 @@ void log_sensor() {
   Serial.print(" A4: ");
   Serial.print(a4_value);
   Serial.println("");
-  Serial.print("A5: ");
-  Serial.print(a5_value);
-  Serial.print(" A6: ");
-  Serial.print(a6_value);
-  Serial.print(" A7: ");
-  Serial.print(a7_value);
-  Serial.print(" A?: ");
-  Serial.print("0");
-  Serial.print(" A9: ");
-  Serial.print(a9_value);
+  Serial.print(" cross: ");
+  Serial.print(cross);
+  Serial.print(" right_count: ");
+  Serial.print(right_count);
+  Serial.println("");
   Serial.println("");
   Serial.println("");
 }
