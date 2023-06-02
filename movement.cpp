@@ -29,23 +29,28 @@ void reset()
     digitalWrite(backRight[1], 0);
 }
 
-void move(byte speed, byte direction)
+void move(byte speed, String direction)
 {
     // Reset Digital Value intA and intB
-    reset();
+    String old_direction;
+    if (old_direction != direction)
+    {
+        reset();
+        old_direction = direction;
+    }
 
     // Set Enable Pin Speed
     analogWrite(frontLeft[2], speed);
-    analogWrite(frontRight[2], speed - 5);
+    analogWrite(frontRight[2], speed);
     analogWrite(backLeft[2], speed);
-    analogWrite(backRight[2], speed - 5);
+    analogWrite(backRight[2], speed);
 
     /*
     Direction Position 0 = Break Move, 1 = Move Front,
     2 = Move Left, 3 = Move Right, 4 = Move Back,
     200 = Test Run
     */
-    if (direction == 0)
+    if (direction == "stop")
     {
         // Break Move
         analogWrite(frontLeft[2], 0);
@@ -53,7 +58,7 @@ void move(byte speed, byte direction)
         analogWrite(backLeft[2], 0);
         analogWrite(backRight[2], 0);
     }
-    else if (direction == 1)
+    else if (direction == "front")
     {
         // Move Front
         digitalWrite(frontLeft[0], 1);
@@ -61,7 +66,7 @@ void move(byte speed, byte direction)
         digitalWrite(backLeft[0], 1);
         digitalWrite(backRight[1], 1);
     }
-    else if (direction == 2)
+    else if (direction == "left")
     {
         // Move Left
         digitalWrite(frontLeft[1], 1);
@@ -69,7 +74,7 @@ void move(byte speed, byte direction)
         digitalWrite(backLeft[0], 1);
         digitalWrite(backRight[0], 1);
     }
-    else if (direction == 3)
+    else if (direction == "right")
     {
         // Move Right
 
@@ -78,13 +83,13 @@ void move(byte speed, byte direction)
         digitalWrite(backLeft[1], 1);
         digitalWrite(backRight[1], 1);
     }
-    else if (direction == 4)
+    else if (direction == "back")
     {
-        // Move Front
-        digitalWrite(frontLeft[0], 1);
-        digitalWrite(frontRight[1], 1);
-        digitalWrite(backLeft[0], 1);
-        digitalWrite(backRight[1], 1);
+        // Move Back
+        digitalWrite(frontLeft[1], 1);
+        digitalWrite(frontRight[0], 1);
+        digitalWrite(backLeft[1], 1);
+        digitalWrite(backRight[0], 1);
     }
     else
     {

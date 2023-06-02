@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 void move_setup();
-void move(byte speed, byte direction);
+void move(byte speed, String direction);
 void reset();
 
 #endif
