@@ -76,6 +76,14 @@ void move(byte speed, String direction)
         digitalWrite(backLeft[1], 1);
         digitalWrite(backRight[1], 1);
     }
+    else if (direction == "sleft")
+    {
+        // Move Slide Left
+        digitalWrite(frontLeft[1], 1);
+        digitalWrite(frontRight[0], 1);
+        digitalWrite(backLeft[1], 1);
+        digitalWrite(backRight[0], 1);
+    }
     else if (direction == "right")
     {
         // Move Right
@@ -83,6 +91,14 @@ void move(byte speed, String direction)
         digitalWrite(frontRight[0], 1);
         digitalWrite(backLeft[0], 1);
         digitalWrite(backRight[0], 1);
+    }
+    else if (direction == "sright")
+    {
+        // Move Slide Right
+        digitalWrite(frontLeft[0], 1);
+        digitalWrite(frontRight[1], 1);
+        digitalWrite(backLeft[0], 1);
+        digitalWrite(backRight[1], 1);
     }
     else if (direction == "back")
     {

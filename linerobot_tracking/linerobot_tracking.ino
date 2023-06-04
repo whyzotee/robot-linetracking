@@ -144,6 +144,11 @@ void loop() {
   }
 
   if (isCenter()) {
+    while (true) {
+      sensor_read();
+      balance_slide_left();
+      delay(50);
+    }
     if (cross == 0) {
       delay(500);
       isMove = false;
@@ -252,6 +257,11 @@ void balance_move_back() {
   } else {
     move(0, "stop");
   }
+}
+
+
+void balance_slide_left() {
+  move(speed, "sleft");
 }
 
 void sensor_read() {
