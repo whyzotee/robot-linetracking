@@ -1,3 +1,5 @@
+#include "motor.h"
+#include "sensor.h"
 #include "movement.h"
 
 // Extend To Array { speed, speed - 5, speed, speed - 5} max value's 255
@@ -5,10 +7,10 @@
 
 // value sensor is in black line
 #define BLACK_VALUE_MAX 400
-#define BLACK_VALUE_MIN 200
+#define BLACK_VALUE_MIN 350
 
 // Sensor Tracking Position -> { a0  a1  a2  a3  a4 }
-#define SENSOR_A0 54
+#define SENSOR_A0 64
 #define SENSOR_A1 55
 #define SENSOR_A2 56
 #define SENSOR_A3 57
@@ -20,9 +22,6 @@
 #define SENSOR_A7 61
 #define SENSOR_A8 62
 #define SENSOR_A9 60
-
-// const byte sensor_front[5] = {54, 55, 56, 57, 58};
-// const byte sensor_center[5] = {60, 0, 61, 59, 63};
 
 short a0_value, a1_value, a2_value, a3_value, a4_value;
 short a5_value, a6_value, a7_value, a8_value, a9_value;
@@ -40,11 +39,15 @@ int cross = 0;
 int soi_count = 0;
 int finish_soi_count = 0;
 
+Motor motor;
+Movement movement;
+movement.sensor = Sensor(255, 300);
+
 void setup()
 {
   Serial.begin(115200);
 
-  move_setup();
+  motor.initMotor();
 
   pinMode(SENSOR_A0, INPUT);
   pinMode(SENSOR_A1, INPUT);
@@ -86,7 +89,7 @@ void loop()
           cross += 1;
         }
       }
-      move(SPEED, "left");
+      motor.move(SPEED, "left");
     }
     else if (cross == 1)
     {
@@ -100,6 +103,7 @@ void loop()
           {
             isSoi = true;
             isMove = true;
+            soi_count = 0;
             delayTurn = 0;
             cross += 1;
           }
@@ -118,9 +122,22 @@ void loop()
           cross += 1;
         }
       }
-      move(SPEED, "right");
+      motor.move(SPEED, "right");
     }
-    else if (cross == 4)
+    else if (cross == 3)
+    {
+      if (currentTime - delayTurn > 800)
+      {
+        if (isBlack(a2_value) || isBlack(a3_value))
+        {
+          isMove = true;
+          delayTurn = 0;
+          cross += 1;
+        }
+      }
+      motor.move(SPEED, "right");
+    }
+    else if (cross == 5)
     {
       if (currentTime - delayTurn > 800)
       {
@@ -132,6 +149,7 @@ void loop()
           {
             isSoi = true;
             isMove = true;
+            soi_count = 0;
             delayTurn = 0;
             cross += 1;
           }
@@ -139,13 +157,26 @@ void loop()
       }
       balance_slide('L');
     }
+    else if (cross == 6)
+    {
+      if (currentTime - delayTurn > 800)
+      {
+        if (isBlack(a2_value) || isBlack(a3_value))
+        {
+          isMove = true;
+          delayTurn = 0;
+          cross += 1;
+        }
+      }
+      motor.move(SPEED, "right");
+    }
   }
 
   if (isCenter())
   {
     if (cross == 0)
     {
-      delay(500);
+      delay(400);
       if (delayTurn == 0)
       {
         isMove = false;
@@ -154,24 +185,24 @@ void loop()
     }
     else if (cross == 1)
     {
-      delay(250);
-      move(SPEED, "left");
-      delay(175);
+      delay(300);
       if (delayTurn == 0)
       {
         isMove = false;
         delayTurn = currentTime;
       }
     }
-    else if (cross == 3)
-    {
-      cross += 1;
-    }
     else if (cross == 4)
     {
-      delay(250);
-      move(SPEED, "left");
-      delay(175);
+      delay(200);
+      balance_move();
+      cross += 1;
+    }
+    else if (cross == 5)
+    {
+      delay(200);
+      motor.move(SPEED, "right");
+      delay(100);
       if (delayTurn == 0)
       {
         isMove = false;
@@ -182,14 +213,13 @@ void loop()
 
   if (isBlack(a2_value) && isBlack(a3_value) && isBlack(a4_value))
   {
-    if (cross == 2 && finish_soi_count == 1)
+    if ((cross == 2 || cross == 3 || cross == 6) && finish_soi_count == 1)
     {
       delay(500);
       if (delayTurn == 0)
       {
         isMove = false;
         delayTurn = currentTime;
-        cross += 1;
       }
     }
   }
@@ -205,7 +235,7 @@ void loop()
 
 bool isCenter()
 {
-  return (isBlack(a0_value) && isBlack(a1_value) && isBlack(a2_value) && isBlack(a3_value) && isBlack(a4_value));
+  return (a0_value > 850 && isBlack(a1_value) && isBlack(a2_value) && isBlack(a3_value) && isBlack(a4_value));
 }
 
 bool isBlack(short sensor_value)
@@ -217,58 +247,57 @@ void balance_move()
 {
   // Apply the control output to the movement
   if (isBlack(a2_value))
-    move(SPEED, "front");
-  else if (isBlack(a0_value) || isBlack(a1_value))
-    move(SPEED, "left");
+    motor.move(SPEED, "front");
+  else if (a0_value > 850 || isBlack(a1_value))
+    motor.move(SPEED, "left");
   else if (isBlack(a3_value) || isBlack(a4_value))
-    move(SPEED, "right");
+    motor.move(SPEED, "right");
   else
   {
     if (isSoi)
     {
-      move(0, "stop");
-      delay(1000);
-      move(SPEED, "back");
-      delay(500);
-      isBack = true;
+      if (isBack)
+      {
+        motor.move(SPEED, "front");
+      }
+      else
+      {
+        motor.move(0, "stop");
+        delay(1000);
+        motor.move(SPEED, "back");
+        delay(500);
+        isBack = true;
+      }
     }
     else
-      move(0, "stop");
+      motor.move(0, "stop");
   }
 }
 
 void balance_move_back()
 {
   if (isBlack(a2_value))
-    move(SPEED, "back");
+    motor.move(SPEED, "back");
   else if (isBlack(a1_value) || isBlack(a4_value))
-  {
-    // move(SPEED, "right");
-    // delay(100);
-    move(SPEED, "back");
-    // delay(100);
-  }
-  else if (isBlack(a0_value) || isBlack(a3_value))
-  {
-    // move(SPEED, "left");
-    // delay(100);
-    move(SPEED, "back");
-    // delay(100);
-  }
+    motor.move(SPEED, "back");
+  else if (a0_value > 850 || isBlack(a3_value))
+    motor.move(SPEED, "back");
   else
   {
     if (isSoi)
     {
-      move(SPEED, "front");
+      motor.move(SPEED, "front");
       delay(750);
-      move(SPEED, "right");
-      delay(900);
+      motor.move(SPEED, "right");
+      delay(750);
+      isMove = false;
       isSoi = false;
       isBack = false;
       finish_soi_count += 1;
+      Serial.println("back");
     }
     else
-      move(0, "stop");
+      motor.move(0, "stop");
   }
 }
 
@@ -276,19 +305,19 @@ void balance_slide(char direction)
 {
   if (direction == 'L')
     if (isBlack(a5_value) || isBlack(a6_value))
-      move(SPEED, "sleft");
+      motor.move(SPEED, "sleft");
     else if (isBlack(a7_value) || isBlack(a8_value) || a9_value > 300)
-      move(SPEED, "back");
+      motor.move(100, "back");
     else
-      move(SPEED, "stop");
+      motor.move(SPEED, "stop");
 
   if (direction == 'R')
     if (isBlack(a8_value) || a9_value > 300)
-      move(SPEED, "sright");
+      motor.move(SPEED, "sright");
     else if (isBlack(a5_value) || isBlack(a6_value) || isBlack(a7_value))
-      move(150, "front");
+      motor.move(150, "front");
     else
-      move(SPEED, "stop");
+      motor.move(SPEED, "stop");
 }
 
 void sensor_read()
