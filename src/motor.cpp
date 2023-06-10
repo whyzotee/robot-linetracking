@@ -12,6 +12,8 @@ void Motor::begin(int baseSpeed, int maxSpeed, int minSpeed)
         pinMode(this->backRight[i], OUTPUT);
     }
 
+    // this->reset();
+
     this->Kp = 20;
     this->Kd = 5;
     this->Ki = 5;
@@ -24,11 +26,15 @@ void Motor::reset()
 {
     for (byte i = 0; i < 3; i++)
     {
-        digitalWrite(this->frontLeft[i], 0);
-        digitalWrite(this->frontRight[i], 0);
-        digitalWrite(this->backLeft[i], 0);
-        digitalWrite(this->backRight[i], 0);
+        digitalWrite(this->frontLeft[i], LOW);
+        digitalWrite(this->frontRight[i], LOW);
+        digitalWrite(this->backLeft[i], LOW);
+        digitalWrite(this->backRight[i], LOW);
     }
+    // analogWrite(this->frontLeft[2], 0);
+    // analogWrite(this->frontRight[2], 0);
+    // analogWrite(this->backLeft[2], 0);
+    // analogWrite(this->backRight[2], 0);
 }
 
 void Motor::move(int speed, String direction)
@@ -41,45 +47,45 @@ void Motor::move(int speed, String direction)
     }
 
     // PID Calculate
-    this->motorSpeed = (this->Kp * this->sensor.error) + (this->Kd * (this->sensor.error - this->sensor.pre_error)) + (this->Ki * this->sensor.sum_error);
-    this->leftSpeed = this->baseSpeed + this->motorSpeed;
-    this->rightSpeed = this->baseSpeed - this->motorSpeed;
+    // this->motorSpeed = (this->Kp * this->sensor.error) + (this->Kd * (this->sensor.error - this->sensor.pre_error)) + (this->Ki * this->sensor.sum_error);
+    // this->leftSpeed = this->baseSpeed + this->motorSpeed;
+    // this->rightSpeed = this->baseSpeed - this->motorSpeed;
 
-    if (this->leftSpeed > this->maxSpeed)
-        this->leftSpeed = this->maxSpeed;
-    if (this->rightSpeed > this->maxSpeed)
-        this->rightSpeed = this->maxSpeed;
+    // if (this->leftSpeed > this->maxSpeed)
+    //     this->leftSpeed = this->maxSpeed;
+    // if (this->rightSpeed > this->maxSpeed)
+    //     this->rightSpeed = this->maxSpeed;
 
-    if (this->leftSpeed < this->minSpeed)
-        this->leftSpeed = this->minSpeed;
-    if (this->rightSpeed < this->minSpeed)
-        this->rightSpeed = this->minSpeed;
+    // if (this->leftSpeed < this->minSpeed)
+    //     this->leftSpeed = this->minSpeed;
+    // if (this->rightSpeed < this->minSpeed)
+    //     this->rightSpeed = this->minSpeed;
 
-    this->sensor.pre_error = this->sensor.error;
-    this->sensor.sum_error += this->sensor.error;
+    // this->sensor.pre_error = this->sensor.error;
+    // this->sensor.sum_error += this->sensor.error;
 
     // Set Enable Pin Speed
-    if (direction == "sleft")
-    {
-        analogWrite(this->frontLeft[2], speed);
-        analogWrite(this->frontRight[2], speed - 160);
-        analogWrite(this->backLeft[2], speed);
-        analogWrite(this->backRight[2], speed - 160);
-    }
-    else if (direction == "sright")
-    {
-        analogWrite(this->frontLeft[2], speed);
-        analogWrite(this->frontRight[2], speed - 175);
-        analogWrite(this->backLeft[2], speed);
-        analogWrite(this->backRight[2], speed);
-    }
-    else
-    {
-        analogWrite(this->frontLeft[2], this->leftSpeed);
-        analogWrite(this->frontRight[2], this->rightSpeed);
-        analogWrite(this->backLeft[2], this->leftSpeed);
-        analogWrite(this->backRight[2], this->rightSpeed);
-    }
+    // if (direction == "sleft")
+    // {
+    //     analogWrite(this->frontLeft[2], speed);
+    //     analogWrite(this->frontRight[2], speed - 160);
+    //     analogWrite(this->backLeft[2], speed);
+    //     analogWrite(this->backRight[2], speed - 160);
+    // }
+    // else if (direction == "sright")
+    // {
+    //     analogWrite(this->frontLeft[2], speed);
+    //     analogWrite(this->frontRight[2], speed - 175);
+    //     analogWrite(this->backLeft[2], speed);
+    //     analogWrite(this->backRight[2], speed);
+    // }
+    // else
+    // {
+    analogWrite(this->frontLeft[2], speed);
+    analogWrite(this->frontRight[2], speed);
+    analogWrite(this->backLeft[2], speed);
+    analogWrite(this->backRight[2], speed);
+    // }
 
     if (direction == "stop")
     {
@@ -160,10 +166,10 @@ void Motor::balance_move(bool isFront)
     {
         if (this->sensor.s2)
             this->move(this->baseSpeed, "front");
-        // else if (this->sensor.s0 || this->sensor.s1)
-        //     this->motor.move(this->baseSpeed, "left");
-        // else if (this->sensor.s3 || this->sensor.s4)
-        //     this->motor.move(this->baseSpeed, "right");
+        else if (this->sensor.s0 || this->sensor.s1)
+            this->move(this->baseSpeed, "front");
+        else if (this->sensor.s3 || this->sensor.s4)
+            this->move(this->baseSpeed, "front");
         else
             this->move(0, "stop");
         // else

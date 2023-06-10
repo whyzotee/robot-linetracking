@@ -23,8 +23,6 @@ uint64_t delayLight = 0;
 uint64_t delayTurn = 0;
 
 byte quest = 0;
-byte soi_count = 0;
-byte finish_soi_count = 0;
 
 enum Status
 {
@@ -35,7 +33,7 @@ enum Status
 
 Status status = red;
 
-bool Power = false;
+bool P1 = false;
 bool isMove = true;
 bool isFront = true;
 bool isSoi = false;
@@ -50,7 +48,7 @@ void lightBlink(uint8_t pin)
   digitalWrite(pin, LOW);
 }
 
-void displayStatus()
+void displayStatus(bool Power)
 {
   display.clearDisplay();
   display.setCursor(0, 0);
@@ -73,200 +71,74 @@ void setup()
   motor.begin(255, 255, 100);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 
-  for (uint8_t i = 1; i <= 3; i++)
-  {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.println("Hello World!");
-    display.println("Robot By EN CMTC");
-    display.println("");
-    display.print("Start Robot in: ");
-    display.println(4 - i);
-    display.setCursor(0, 0);
-    display.display();
-    delay(1000);
-  }
+  // for (uint8_t i = 1; i <= 3; i++)
+  // {
+  //   display.clearDisplay();
+  //   display.setTextSize(1);
+  //   display.setTextColor(SSD1306_WHITE);
+  //   display.setCursor(0, 0);
+  //   display.println("Hello World!");
+  //   display.println("Robot By EN CMTC");
+  //   display.println("");
+  //   display.print("Start Robot in: ");
+  //   display.println(4 - i);
+  //   display.setCursor(0, 0);
+  //   display.display();
+  //   delay(1000);
+  // }
 }
 
 void loop()
 {
-  displayStatus();
+  motor.move(255, "sleft");
+  delay(3500);
+  motor.move(255, "sright");
+  delay(3500);
 
   // CurrentTimeLine
   currentTime = millis();
 
+  // Start Mode
+  P1 = digitalRead(24);
+
   // Read Sensor From Class
   sensor.read();
 
+  // Status in monitor
+  // displayStatus(P1);
+
   // Status of LED
-  switch (status)
-  {
-  case red:
-    digitalWrite(0, HIGH);
-    break;
-  case yellow:
-    lightBlink(0);
-    break;
-  case green:
-    lightBlink(0);
-    break;
-  }
+  // switch (status)
+  // {
+  // case red:
+  //   digitalWrite(0, HIGH);
+  //   break;
+  // case yellow:
+  //   lightBlink(0);
+  //   break;
+  // case green:
+  //   lightBlink(0);
+  //   break;
+  // }
 
-  if (Power && isMove)
-  {
-    motor.balance_move(isFront);
-    status = green;
-  }
+  // if (P1 && isMove)
+  // {
+  //   motor.balance_move(isFront);
+  //   status = green;
+  // }
 
-  if (Power && !isMove)
-  {
-    if (quest == 0)
-    {
-      if (currentTime - delayTurn > 800)
-      {
-        if (sensor.s2 || sensor.s3)
-        {
-          isMove = true;
-          delayTurn = 0;
-          quest += 1;
-        }
-      }
-      motor.move(255, "left");
-    }
-    else if (quest == 1)
-    {
-      if (currentTime - delayTurn > 800)
-      {
-        if (sensor.s1 || sensor.s2)
-        {
-          soi_count += 1;
-          delayTurn = currentTime;
-          if (soi_count == 4)
-          {
-            isSoi = true;
-            isMove = true;
-            soi_count = 0;
-            delayTurn = 0;
-            quest += 1;
-          }
-        }
-      }
-      motor.slide('L');
-    }
-    else if (quest == 2 && isFront)
-    {
-      if (currentTime - delayTurn > 800)
-      {
-        if (sensor.s1 || sensor.s2)
-        {
-          isMove = true;
-          delayTurn = 0;
-          quest += 1;
-        }
-      }
-      motor.move(255, "right");
-    }
-    else if (quest == 3)
-    {
-      if (currentTime - delayTurn > 800)
-      {
-        if (sensor.s2 || sensor.s3)
-        {
-          isMove = true;
-          delayTurn = 0;
-          quest += 1;
-        }
-      }
-      motor.move(255, "right");
-    }
-    else if (quest == 5)
-    {
-      if (currentTime - delayTurn > 800)
-      {
-        if (sensor.s1 || sensor.s2)
-        {
-          soi_count += 1;
-          delayTurn = currentTime;
-          if (soi_count == 4)
-          {
-            isSoi = true;
-            isMove = true;
-            soi_count = 0;
-            delayTurn = 0;
-            quest += 1;
-          }
-        }
-      }
-      motor.slide('L');
-    }
-    else if (quest == 6)
-    {
-      if (currentTime - delayTurn > 800)
-      {
-        if (sensor.s2 || sensor.s3)
-        {
-          isMove = true;
-          delayTurn = 0;
-          quest += 1;
-        }
-      }
-      motor.move(255, "right");
-    }
-  }
+  // if (P1 && !isMove)
+  // {
+  //   switch (quest)
+  //   {
+  //   case 1:
+  //     /* code */
+  //     break;
 
-  if (sensor.isCenter())
-  {
-    if (quest == 0)
-    {
-      delay(400);
-      if (delayTurn == 0)
-      {
-        isMove = false;
-        delayTurn = currentTime;
-      }
-    }
-    else if (quest == 1)
-    {
-      delay(300);
-      if (delayTurn == 0)
-      {
-        isMove = false;
-        delayTurn = currentTime;
-      }
-    }
-    else if (quest == 4)
-    {
-      delay(200);
-      motor.balance_move(true);
-      quest += 1;
-    }
-    else if (quest == 5)
-    {
-      delay(200);
-      motor.move(255, "right");
-      delay(100);
-      if (delayTurn == 0)
-      {
-        isMove = false;
-        delayTurn = currentTime;
-      }
-    }
-  }
-
-  if (sensor.isRightCross())
-  {
-    if ((quest == 2 || quest == 3 || quest == 6) && finish_soi_count == 1)
-    {
-      delay(500);
-      if (delayTurn == 0)
-      {
-        isMove = false;
-        delayTurn = currentTime;
-      }
-    }
-  }
+  //   default:
+  //     break;
+  //   }
+  // }
 
   if (currentTime - delayLog > 250)
   {
