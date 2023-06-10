@@ -1,6 +1,0 @@
-{
-    "configuration": "cpu=atmega2560",
-    "board": "arduino:avr:mega",
-    "sketch": "src\\robot_line_tracking\\robot_line_tracking.ino",
-    "port": "COM8"
-}
