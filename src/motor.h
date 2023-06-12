@@ -7,13 +7,12 @@
 class Motor
 {
 private:
-    Sensor sensor;
     String old_direction;
 
-    const uint8_t frontLeft[3] = {39, 38, 2};
-    const uint8_t frontRight[3] = {51, 50, 11};
-    const uint8_t backLeft[3] = {48, 49, 12};
-    const uint8_t backRight[3] = {53, 52, 10};
+    const uint8_t frontLeft[3] = {47, 46, 13};
+    const uint8_t frontRight[3] = {43, 42, 11};
+    const uint8_t backLeft[3] = {48, 49, 9};
+    const uint8_t backRight[3] = {45, 44, 10};
 
     double Kp, Kd, Ki;
     int motorSpeed, leftSpeed, rightSpeed;
@@ -22,6 +21,7 @@ private:
     void reset();
 
 public:
+    Sensor sensor;
     void begin(int baseSpeed, int maxSpeed, int minSpeed);
     void move(int speed, String direction);
     void balance_move(bool isFront);

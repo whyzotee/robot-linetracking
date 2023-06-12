@@ -2,7 +2,7 @@
 
 void Sensor::begin()
 {
-    this->black_value = 300;
+    this->black_value = 500;
 }
 
 void Sensor::read()
@@ -11,13 +11,12 @@ void Sensor::read()
     this->s1 = isBlack(analogRead(A1), 0);
     this->s2 = isBlack(analogRead(A2), 0);
     this->s3 = isBlack(analogRead(A3), 0);
-    this->s4 = isBlack(analogRead(A4), 450);
+    this->s4 = isBlack(analogRead(A4), 0);
     this->s5 = isBlack(analogRead(A5), 0);
     this->s6 = isBlack(analogRead(A6), 0);
     this->s7 = isBlack(analogRead(A7), 0);
     this->s8 = isBlack(analogRead(A8), 0);
     this->s9 = isBlack(analogRead(A9), 0);
-    this->s10 = isBlack(analogRead(A10), 0);
 }
 
 void Sensor::findError()
@@ -54,10 +53,11 @@ void Sensor::log()
     Serial.print(analogRead(A3));
     Serial.print(" A4: ");
     Serial.print(analogRead(A4));
-    Serial.print("A5: ");
-    Serial.print(analogRead(A5));
+    Serial.println("");
     Serial.println("");
 
+    Serial.print("A5: ");
+    Serial.print(analogRead(A5));
     Serial.print(" A6: ");
     Serial.print(analogRead(A6));
     Serial.print(" A7: ");
@@ -66,13 +66,11 @@ void Sensor::log()
     Serial.print(analogRead(A8));
     Serial.print(" A9: ");
     Serial.print(analogRead(A9));
-    Serial.print(" A10: ");
-    Serial.print(analogRead(A10));
     Serial.println("");
     Serial.println("");
 }
 
-bool Sensor::isBlack(short sensor_value, int offset)
+bool Sensor::isBlack(uint16_t sensor_value, int offset)
 {
     return sensor_value > this->black_value + offset;
 }

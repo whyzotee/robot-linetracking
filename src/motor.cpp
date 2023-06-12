@@ -143,33 +143,22 @@ void Motor::move(int speed, String direction)
         digitalWrite(this->backLeft[1], 1);
         digitalWrite(this->backRight[0], 1);
     }
-    else
-    {
-        // Test Run
-        digitalWrite(this->frontLeft[0], 1);
-        digitalWrite(this->frontRight[1], 1);
-        digitalWrite(this->backLeft[0], 1);
-        digitalWrite(this->backRight[1], 1);
-        delay(1000);
-
-        digitalWrite(this->frontLeft[1], 1);
-        digitalWrite(this->frontRight[0], 1);
-        digitalWrite(this->backLeft[1], 1);
-        digitalWrite(this->backRight[0], 1);
-        delay(1000);
-    }
 }
 
 void Motor::balance_move(bool isFront)
 {
     if (isFront)
     {
-        if (this->sensor.s2)
-            this->move(this->baseSpeed, "front");
-        else if (this->sensor.s0 || this->sensor.s1)
-            this->move(this->baseSpeed, "front");
-        else if (this->sensor.s3 || this->sensor.s4)
-            this->move(this->baseSpeed, "front");
+        if (sensor.s2)
+        {
+            // this->move(this->baseSpeed, "front");
+            this->move(255, "front");
+        }
+
+        else if ((this->sensor.s0) || (this->sensor.s1))
+            this->move(255, "left");
+        else if ((this->sensor.s3) || (this->sensor.s4))
+            this->move(255, "right");
         else
             this->move(0, "stop");
         // else
