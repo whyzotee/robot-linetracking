@@ -89,3 +89,8 @@ bool Sensor::isRightCross()
 {
     return !this->s0 && !this->s1 && this->s2 && this->s3 && this->s4;
 }
+
+bool Sensor::isSomeBlack()
+{
+    return this->s0 || this->s1 || this->s2 || this->s3 || this->s4;
+}

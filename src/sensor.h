@@ -24,6 +24,7 @@ public:
     bool isCenter();
     bool isLeftCross();
     bool isRightCross();
+    bool isSomeBlack();
 };
 
 #endif

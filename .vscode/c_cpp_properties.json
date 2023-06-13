@@ -10,8 +10,9 @@
             "includePath": [
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/include",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/src",
-                "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/AccelStepper/src",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Stepper/src",
+                "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit_VL53L0X/src",
+                "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Servo/src",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit SSD1306",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit GFX Library",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit BusIO",
@@ -29,8 +30,9 @@
                 "path": [
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/include",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/src",
-                    "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/AccelStepper/src",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Stepper/src",
+                    "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit_VL53L0X/src",
+                    "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Servo/src",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit SSD1306",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit GFX Library",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit BusIO",
