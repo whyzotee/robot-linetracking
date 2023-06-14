@@ -1,6 +1,6 @@
-// #include <EEPROM.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <EEPROM.h>
 #include <Arduino.h>
 #include <Stepper.h>
 #include <Adafruit_GFX.h>
@@ -11,6 +11,8 @@
 #include "motor.h"
 #include "sensor.h"
 
+#define TX1 18
+#define RX1 19
 #define OLED_RESET -1
 #define EMERGENCY_PIN 3
 #define STEPPER_SW 32
@@ -67,6 +69,79 @@ bool isObject = true;
 bool stepperSW = false;
 bool emergencyBTN = false;
 
+int error = 0;
+int pre_error = 0;
+int sum_error = 0;
+
+int Kp = 30;
+int Kd = 5;
+int Ki = 0.2;
+int motorSpeed, leftSpeed, rightSpeed;
+int baseSpeed = 150;
+int maxSpeed = 255;
+
+void movePID()
+{
+  if (!sensor.s0 && !sensor.s1 && !sensor.s2 && !sensor.s3 && sensor.s4)
+    error = 4;
+  else if (!sensor.s0 && !sensor.s1 && !sensor.s2 && sensor.s3 && sensor.s4)
+    error = 3;
+  else if (!sensor.s0 && !sensor.s1 && !sensor.s2 && sensor.s3 && !sensor.s4)
+    error = 2;
+  else if (!sensor.s0 && !sensor.s1 && sensor.s2 && sensor.s3 && !sensor.s4)
+    error = 1;
+  else if (!sensor.s0 && !sensor.s1 && sensor.s2 && !sensor.s3 && !sensor.s4)
+    error = 0;
+  else if (!sensor.s0 && sensor.s1 && sensor.s2 && !sensor.s3 && !sensor.s4)
+    error = -1;
+  else if (!sensor.s0 && sensor.s1 && !sensor.s2 && !sensor.s3 && !sensor.s4)
+    error = -2;
+  else if (sensor.s0 && sensor.s1 && !sensor.s2 && !sensor.s3 && !sensor.s4)
+    error = -3;
+  else if (sensor.s0 && !sensor.s1 && !sensor.s2 && !sensor.s3 && !sensor.s4)
+    error = -4;
+  else if (!sensor.s0 && !sensor.s1 && !sensor.s2 && !sensor.s3 && !sensor.s4)
+    error = pre_error;
+
+  // PID Calculate
+  motorSpeed = (Kp * error) + (Kd * (error - pre_error)) + (Ki * sum_error);
+  leftSpeed = baseSpeed + motorSpeed;
+  rightSpeed = baseSpeed - motorSpeed;
+
+  // if (leftSpeed > maxSpeed)
+  //   leftSpeed = maxSpeed;
+  // if (rightSpeed > maxSpeed)
+  //   rightSpeed = maxSpeed;
+
+  // if (leftSpeed < -maxSpeed)
+  //   leftSpeed = -maxSpeed;
+  // if (rightSpeed < maxSpeed)
+  //   rightSpeed = -maxSpeed;
+
+  leftSpeed = constrain(leftSpeed, -maxSpeed, maxSpeed);
+  rightSpeed = constrain(rightSpeed, -maxSpeed, maxSpeed);
+
+  analogWrite(motor.frontLeft[2], leftSpeed);
+  analogWrite(motor.frontRight[2], rightSpeed);
+  analogWrite(motor.backLeft[2], leftSpeed);
+  analogWrite(motor.backRight[2], rightSpeed);
+
+  digitalWrite(motor.frontLeft[0], 1);
+  digitalWrite(motor.frontRight[1], 1);
+  digitalWrite(motor.backLeft[0], 1);
+  digitalWrite(motor.backRight[1], 1);
+
+  pre_error = error;
+  sum_error += error;
+
+  Serial.print("error : ");
+  Serial.println(error);
+  Serial.print("pre_error : ");
+  Serial.println(pre_error);
+  Serial.print("sum_error : ");
+  Serial.println(sum_error);
+}
+
 void displayStatus(bool Power)
 {
   display.clearDisplay();
@@ -76,7 +151,7 @@ void displayStatus(bool Power)
   display.print("isMove: ");
   display.println(isMove ? "true" : "false");
   display.print("PID Error: ");
-  display.println(sensor.error);
+  display.println(error);
   display.print("Now Quest: ");
   display.println(quest);
   display.display();
@@ -88,11 +163,28 @@ void balance_move(char LOR)
   if (isFront)
   {
     if (sensor.s2)
-      motor.move(255, "front");
+    {
+      if (mode == "OBJ")
+        motor.move(200, "front");
+      else
+        motor.move(255, "front");
+    }
     else if ((sensor.s0) || (sensor.s1))
-      motor.move(255, "left");
+    {
+      if (mode == "OBJ")
+        motor.move(200, "left");
+      else
+        motor.move(255, "left");
+    }
+
     else if ((sensor.s3) || (sensor.s4))
-      motor.move(255, "right");
+    {
+      if (mode == "OBJ")
+        motor.move(200, "right");
+      else
+        motor.move(255, "right");
+    }
+
     // else
     //   motor.move(50, "front");
     delayNotFoundSensor = 0;
@@ -141,7 +233,7 @@ void gotoCenter()
   {
     if (sensor.isCenter())
     {
-      delay(100);
+      delay(50);
       mode = "CT_CROSS";
       delayGoToCenter = 0;
     }
@@ -163,7 +255,7 @@ void gotoOBJ(char direction)
       {
         motor.move(255, "stop");
         arm.centerArm();
-        for (uint8_t i = 0; i < 5; i++)
+        for (uint8_t i = 0; i < 4; i++)
         {
           motorStepper.step(-stepsPerRevolution);
         }
@@ -234,7 +326,7 @@ void first(String _mode)
 
     if (currentTime - delayGoToCenter > 1000)
     {
-      if (currentTime - delayCross > 750)
+      if (currentTime - delayCross > 1000)
       {
         if (sensor.s3 || sensor.s4)
         {
@@ -260,7 +352,7 @@ void first(String _mode)
 
     if (currentTime - delayTurn > 1000)
     {
-      if (sensor.s1 || sensor.s2)
+      if (sensor.s2)
       {
         quest += 1;
         delayTurn = 0;
@@ -274,24 +366,36 @@ void first(String _mode)
     if (delayGoToCenter == 0)
       delayGoToCenter = currentTime;
 
-    if (currentTime - delayGoToCenter > 1200)
+    if (currentTime - delayGoToCenter > 1000)
     {
-      motor.move(0, "stop");
-      delay(200);
-      arm.getObj();
-      delay(1000);
-      for (uint8_t i = 0; i < 5; i++)
+      if (range > 80 && range < 140)
       {
-        motorStepper.step(stepsPerRevolution);
+        motor.move(0, "stop");
+        delay(1000);
+        arm.getObj();
+        delay(1000);
+        for (size_t i = 0; i < 2; i++)
+        {
+          motorStepper.step(stepsPerRevolution);
+        }
+        arm.keepObjLeft();
+        for (size_t i = 0; i < 2; i++)
+        {
+          motorStepper.step(stepsPerRevolution);
+        }
+        delay(500);
+        arm.reset();
+        for (size_t i = 0; i < 4; i++)
+        {
+          motorStepper.step(-stepsPerRevolution);
+        }
+        quest += 1;
+        isFront = false;
+        delayTurn = 0;
       }
-      motor.move(0, "back");
-      delay(200);
-      quest += 1;
-      isFront = false;
-      delayTurn = 0;
     }
 
-    balance_move(' ');
+    movePID();
     break;
   case 6:
     if (delayGoToCenter == 0)
@@ -1278,10 +1382,11 @@ void liftDown()
 void setup()
 {
   Serial.begin(115200);
+  Serial1.begin(115200);
 
   arm.begin();
   sensor.begin();
-  motor.begin(255, 255, 100);
+  motor.begin();
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   motorStepper.setSpeed(250);
 
@@ -1317,15 +1422,15 @@ void setup()
   //   delay(1000);
   // }
 
-  //  if (!lox.begin())
+  // for (uint8_t i = 0; i < 4; i++)
   // {
-  //   Serial.println(F("Failed to boot VL53L0X"));
-  //   return;
+  //   motorStepper.step(stepsPerRevolution);
   // }
 
-  for (uint8_t i = 0; i < 4; i++)
+  if (!lox.begin())
   {
-    motorStepper.step(stepsPerRevolution);
+    Serial.println(F("Failed to boot VL53L0X"));
+    return mode = "error";
   }
 
   // mode go to center
@@ -1341,13 +1446,6 @@ void loop()
   //   Serial.print(buf);
   // }
 
-  // lox.rangingTest(&measure, false);
-
-  // if (measure.RangeStatus != 4)
-  //   range = measure.RangeMilliMeter;
-  // else
-  //   range = 0;
-
   // CurrentTimeLine
   currentTime = millis();
 
@@ -1361,12 +1459,15 @@ void loop()
   // Status in monitor
   displayStatus(P1);
 
-  // digitalWrite(23, !sensor.s0);
-  // digitalWrite(25, !sensor.s1);
-  // digitalWrite(27, !sensor.s2);
-  // digitalWrite(29, !sensor.s3);
-  // digitalWrite(31, !sensor.s4);
+  // เซ็นเซอร์บวัดระยะ
+  lox.rangingTest(&measure, false);
 
+  if (measure.RangeStatus != 4)
+    range = measure.RangeMilliMeter;
+  else
+    range = 0;
+
+  // ปุ่ม Emergency
   if (emergencyBTN)
     status = yellow;
 
@@ -1387,6 +1488,14 @@ void loop()
     break;
   }
 
+  // ถ้า หุ่น Error
+  if (mode == "error")
+  {
+    status = red;
+    isMove = false;
+  }
+
+  // Core Function
   if (!emergencyBTN && isMove)
   {
     status = green;
@@ -1397,50 +1506,52 @@ void loop()
 
     // เก็บกล่อง
     if (mode == "OBJ")
+    {
       first("");
-    if (mode == "FINISH_1")
-      second("");
-    if (mode == "FINISH_2")
-      second("");
-    if (mode == "FINISH_3")
-      third("");
-    if (mode == "FINISH_4")
-      fourth("");
-    if (mode == "FINISH_5")
-      fifth("");
-    if (mode == "FINISH_6")
-      sixth("");
-    if (mode == "FINISH_7")
-      seventh("");
-    if (mode == "FINISH_8")
-      eighth("");
+    }
+    // if (mode == "FINISH_1")
+    //   second("");
+    // if (mode == "FINISH_2")
+    //   second("");
+    // if (mode == "FINISH_3")
+    //   third("");
+    // if (mode == "FINISH_4")
+    //   fourth("");
+    // if (mode == "FINISH_5")
+    //   fifth("");
+    // if (mode == "FINISH_6")
+    //   sixth("");
+    // if (mode == "FINISH_7")
+    //   seventh("");
+    // if (mode == "FINISH_8")
+    //   eighth("");
 
     // วางกล่อง
     if (mode == "Y2")
-      first("FINISH_1");
+      first("OBJ");
     if (mode == "B2")
-      second("FINISH_2");
+      second("OBJ");
     if (mode == "G2")
-      third("FINISH_3");
+      third("OBJ");
     if (mode == "R2")
-      fourth("FINISH_4");
+      fourth("OBJ");
     if (mode == "R1")
-      fifth("FINISH_5");
+      fifth("OBJ");
     if (mode == "G1")
-      sixth("FINISH_6");
+      sixth("OBJ");
     if (mode == "B1")
-      seventh("FINISH_7");
+      seventh("OBJ");
     if (mode == "Y1")
-      eighth("FINISH_8");
+      eighth("OBJ");
   }
 
-  if (currentTime - delayLog > 250)
-  {
-    sensor.log();
-    Serial.print("mode: ");
-    Serial.println(mode);
-    Serial.print("emergencyBTN: ");
-    Serial.println(emergencyBTN);
-    delayLog = currentTime;
-  }
+  // if (currentTime - delayLog > 250)
+  // {
+  //   sensor.log();
+  //   Serial.print("mode: ");
+  //   Serial.println(mode);
+  //   Serial.print("emergencyBTN: ");
+  //   Serial.println(emergencyBTN);
+  //   delayLog = currentTime;
+  // }
 }

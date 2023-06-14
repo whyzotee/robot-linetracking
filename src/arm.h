@@ -18,6 +18,7 @@ public:
     void keepHand();
     void moveup();
     void getObj();
+    void keepObjLeft();
     void centerArm();
     void test();
 };

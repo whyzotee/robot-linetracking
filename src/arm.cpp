@@ -10,8 +10,8 @@ void Arm::begin()
 
 void Arm::reset()
 {
-    this->arm.write(30);
-    this->hand.write(180);
+    this->arm.write(90);
+    this->hand.write(0);
 }
 
 void Arm::keepHand()
@@ -25,6 +25,16 @@ void Arm::getObj()
     this->arm.write(90);
     this->hand.write(180);
 }
+
+void Arm::keepObjLeft()
+{
+    delay(1000);
+    this->arm.write(20);
+    delay(500);
+    this->hand.write(0);
+    delay(1000);
+}
+
 void Arm::centerArm()
 {
     this->arm.write(90);

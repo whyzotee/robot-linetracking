@@ -19,28 +19,6 @@ void Sensor::read()
     this->s9 = isBlack(analogRead(A9), 0);
 }
 
-void Sensor::findError()
-{
-    if (!this->s0 && !this->s1 && !this->s2 && !this->s3 && this->s4)
-        error = 4;
-    else if (!this->s0 && !this->s1 && !this->s2 && this->s3 && this->s4)
-        error = 3;
-    else if (!this->s0 && !this->s1 && !this->s2 && this->s3 && !this->s4)
-        error = 2;
-    else if (!this->s0 && !this->s1 && this->s2 && this->s3 && !this->s4)
-        error = 1;
-    else if (!this->s0 && !this->s1 && this->s2 && !this->s3 && !this->s4)
-        error = 0;
-    else if (!this->s0 && this->s1 && this->s2 && !this->s3 && !this->s4)
-        error = -1;
-    else if (!this->s0 && this->s1 && !this->s2 && !this->s3 && !this->s4)
-        error = -2;
-    else if (this->s0 && this->s1 && !this->s2 && !this->s3 && !this->s4)
-        error = -3;
-    else if (this->s0 && !this->s1 && !this->s2 && !this->s3 && !this->s4)
-        error = -4;
-}
-
 void Sensor::log()
 {
     Serial.print("A0: ");
