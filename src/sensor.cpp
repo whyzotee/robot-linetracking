@@ -34,18 +34,18 @@ void Sensor::log()
     Serial.println("");
     Serial.println("");
 
-    Serial.print("A5: ");
-    Serial.print(analogRead(A5));
-    Serial.print(" A6: ");
-    Serial.print(analogRead(A6));
-    Serial.print(" A7: ");
-    Serial.print(analogRead(A7));
-    Serial.print(" A8: ");
-    Serial.print(analogRead(A8));
-    Serial.print(" A9: ");
-    Serial.print(analogRead(A9));
-    Serial.println("");
-    Serial.println("");
+    // Serial.print("A5: ");
+    // Serial.print(analogRead(A5));
+    // Serial.print(" A6: ");
+    // Serial.print(analogRead(A6));
+    // Serial.print(" A7: ");
+    // Serial.print(analogRead(A7));
+    // Serial.print(" A8: ");
+    // Serial.print(analogRead(A8));
+    // Serial.print(" A9: ");
+    // Serial.print(analogRead(A9));
+    // Serial.println("");
+    // Serial.println("");
 }
 
 bool Sensor::isBlack(uint16_t sensor_value, int offset)

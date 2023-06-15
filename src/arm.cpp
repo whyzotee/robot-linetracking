@@ -14,6 +14,14 @@ void Arm::reset()
     this->hand.write(0);
 }
 
+void Arm::move(String el, uint8_t deg)
+{
+    if (el == "arm")
+        this->arm.write(deg);
+    if (el == "hand")
+        this->hand.write(deg);
+}
+
 void Arm::keepHand()
 {
     this->arm.write(20);
