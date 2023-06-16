@@ -20,6 +20,7 @@ public:
     void moveup();
     void getObj();
     void keepObjLeft();
+    void keepObjRight();
     void centerArm();
     void test();
 };

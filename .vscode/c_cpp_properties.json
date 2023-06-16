@@ -10,6 +10,7 @@
             "includePath": [
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/include",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/src",
+                "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Stepper/src",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit_VL53L0X/src",
                 "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Servo/src",
@@ -20,7 +21,6 @@
                 "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
                 "C:/Users/zenle/.platformio/packages/framework-arduino-avr/cores/arduino",
                 "C:/Users/zenle/.platformio/packages/framework-arduino-avr/variants/mega",
-                "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
                 "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/HID/src",
                 "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
                 ""
@@ -30,6 +30,7 @@
                 "path": [
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/include",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/src",
+                    "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Stepper/src",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Adafruit_VL53L0X/src",
                     "C:/Users/zenle/OneDrive/Documents/GitHub/robot-linetracking/.pio/libdeps/megaatmega2560/Servo/src",
@@ -40,7 +41,6 @@
                     "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
                     "C:/Users/zenle/.platformio/packages/framework-arduino-avr/cores/arduino",
                     "C:/Users/zenle/.platformio/packages/framework-arduino-avr/variants/mega",
-                    "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
                     "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/HID/src",
                     "C:/Users/zenle/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
                     ""

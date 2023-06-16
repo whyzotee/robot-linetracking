@@ -38,15 +38,26 @@ void Arm::keepObjLeft()
 {
     delay(1000);
     this->arm.write(20);
-    delay(500);
+    delay(1000);
+    this->hand.write(0);
+    delay(1000);
+}
+
+void Arm::keepObjRight()
+{
+    delay(1000);
+    this->arm.write(160);
+    delay(1000);
     this->hand.write(0);
     delay(1000);
 }
 
 void Arm::centerArm()
 {
-    this->arm.write(90);
+    this->arm.write(100);
+    delay(1000);
     this->hand.write(0);
+    delay(1000);
 }
 
 void Arm::test()
