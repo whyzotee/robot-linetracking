@@ -15,8 +15,6 @@
 #define TX1 18
 #define RX1 19
 
-#define OLED_RESET -1
-
 #define EMERGENCY_PIN 3
 #define STEPPER_SW 32
 
@@ -35,11 +33,12 @@
 #define LED_STATUS_YELLOW 39
 #define LED_STATUS_GREEN 40
 
-#define LIMIT_SW_LEFT 42
-#define LIMIT_SW_RIGHT 43
+#define LIMIT_SW 42
 
 #define MOTOR_STEP_PIN 35
 #define MOTOR_DIRECTION_PIN 34
+
+#define OLED_RESET -1
 
 SpeedyStepper stepper;
 
@@ -54,10 +53,10 @@ Sensor sensor;
 Motor motor;
 
 // Y1 B1 G1 R1 R2 G2 B2 Y2
-bool isOBJ_FINISH_TO_RIGHT[8] = {false, false, false, false, false, false, false, false};
+bool putOBJ_RIGHT[8] = {false, false, false, false, false, false, false, false};
 
 // Y2 B2 G2 R2 R1 G1 B1 Y1
-bool isOBJ_FINISH_TO_LEFT[8] = {false, false, false, false, false, false, false, false};
+bool putOBJ_LEFT[8] = {false, false, false, false, false, false, false, false};
 
 // Controller Time
 uint64_t currentTime = 0;
@@ -68,15 +67,13 @@ uint64_t delayLight = 0;
 uint64_t delayTurn = 0;
 uint64_t delayCross = 0;
 uint64_t delayGoToCenter = 0;
-uint64_t delayNotFoundSensor = 0;
-uint64_t delayNotFoundColor = 0;
+// uint64_t delayNotFoundSensor = 0;
+// uint64_t delayNotFoundColor = 0;
 
 char buf[2];
-char cacheBox1[2];
 
-byte quest = 1;
-byte soi_count = 0;
-byte finish_soi_count = 0;
+uint8_t quest = 1;
+uint8_t soi_count = 0;
 
 enum Status
 {
@@ -87,26 +84,24 @@ enum Status
 
 Status status;
 
+String mode = "";
 String pMode = "None";
-String mode;
 
 bool checkQRBox = false;
 bool isMove = true;
-bool isFront = true;
 bool isSoi = false;
-bool qrCodeLight = true;
 bool emergencyBTN = false;
 
-int error = 0;
-int pre_error = 0;
-int sum_error = 0;
+uint8_t Kp = 25;
+uint8_t Kd = 2;
+uint8_t Ki = 0.1;
+uint16_t motorSpeed, leftSpeed, rightSpeed;
+uint16_t baseSpeed = 200;
+uint8_t maxSpeed = 255;
 
-int Kp = 25;
-int Kd = 2;
-int Ki = 0.1;
-int motorSpeed, leftSpeed, rightSpeed;
-int baseSpeed = 200;
-int maxSpeed = 255;
+uint16_t error = 0;
+uint16_t pre_error = 0;
+uint16_t sum_error = 0;
 
 void movePID()
 {
@@ -136,11 +131,11 @@ void movePID()
   leftSpeed = baseSpeed + motorSpeed;
   rightSpeed = baseSpeed - motorSpeed;
 
+  // Limit speed min max
   leftSpeed = constrain(leftSpeed, -maxSpeed, maxSpeed);
   rightSpeed = constrain(rightSpeed, -maxSpeed, maxSpeed);
 
-  // old code
-
+  // set drive motor speed
   digitalWrite(motor.frontLeft[2], 1);
   digitalWrite(motor.frontRight[2], 1);
   digitalWrite(motor.backLeft[2], 1);
@@ -164,49 +159,12 @@ void displayStatus()
   display.print("PID Sum Error: ");
   display.println(sum_error);
   display.print("Color: ");
-  display.println(cacheBox1[0]);
+  display.println(buf[0]);
   display.print("Qr Code: ");
-  display.println(cacheBox1[1]);
+  display.println(buf[1]);
   // display.print("Now Quest: ");
   // display.println(quest);
   display.display();
-}
-
-void balance_move(char LOR)
-{
-  delayNotFoundSensor = currentTime;
-  if (isFront)
-  {
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    // else
-    //   motor.move(50, "front");
-    delayNotFoundSensor = 0;
-  }
-  else
-  {
-    if (isSoi)
-    {
-      motor.move(255, "back");
-      delay(1500);
-      if (LOR == 'L')
-        motor.move(255, "left");
-      if (LOR == 'R')
-        motor.move(255, "right");
-      delay(1500);
-
-      isFront = true;
-      isSoi = false;
-    }
-    else
-    {
-      motor.move(0, "stop");
-    }
-  }
 }
 
 void gotoCenter()
@@ -219,13 +177,23 @@ void gotoCenter()
 
     if (sensor.isCenter())
     {
-      delay(75);
+      delay(100);
       mode = "CT_CROSS";
       delayGoToCenter = 0;
     }
   }
 
   motor.move(255, "front");
+}
+
+void gotoSoi()
+{
+  if (sensor.s2)
+    motor.move(90, "front");
+  else if ((sensor.s0) || (sensor.s1))
+    motor.move(55, "left");
+  else if ((sensor.s3) || (sensor.s4))
+    motor.move(55, "right");
 }
 
 void gotoOBJ(char direction)
@@ -235,7 +203,7 @@ void gotoOBJ(char direction)
 
   if (currentTime - delayTurn > 1000)
   {
-    if (sensor.s2 || sensor.s3)
+    if (sensor.s2)
     {
       motor.move(255, "stop");
       arm.centerArm();
@@ -257,19 +225,19 @@ void keepOBJ(char direction)
   motor.move(0, "stop");
   delay(500);
   arm.getObj();
-  delay(500);
-  // stepper.moveRelativeInSteps(32000);
+  delay(1000);
   stepper.moveRelativeInSteps(14000);
   delay(500);
 
   if (direction == 'C')
   {
     stepper.moveRelativeInSteps(16000);
+    delay(500);
+
     quest += 1;
     checkQRBox = false;
-    isFront = false;
     isSoi = true;
-    delayTurn = 0;
+    delayGoToCenter = 0;
     return;
   }
 
@@ -282,64 +250,60 @@ void keepOBJ(char direction)
   checkQRBox = true;
 
   stepper.moveRelativeInSteps(16000);
-  delay(1000);
+  delay(500);
   arm.reset();
-  stepper.moveRelativeInSteps(-24000);
+  stepper.moveRelativeInSteps(-26000);
+  delay(500);
 
   quest += 1;
   checkQRBox = false;
-  isFront = false;
   isSoi = true;
-  delayTurn = 0;
-
-  // _mode = checkQrFromESP32();
-
-  // if (checkQRBox && _mode != "")
-  // {
-  //   stepper.moveRelativeInSteps(16000);
-  //   delay(1000);
-  //   arm.reset();
-  //   stepper.moveRelativeInSteps(-20000);
-
-  //   quest += 1;
-  //   checkQRBox = false;
-  //   isFront = false;
-  //   isSoi = true;
-  //   delayTurn = 0;
-  // }
+  delayGoToCenter = 0;
 }
 
-void putOBJ()
+void putOBJ(char direction)
 {
-  motor.move(0, "stop");
+  if (direction == 'C')
+  {
+    motor.move(0, "stop");
+    delay(500);
+    arm.reset();
+    delay(1000);
+    stepper.moveRelativeInSteps(16000);
+    delay(500);
+    motor.move(150, "back");
+    delay(1000);
+    mode = "END";
+  }
+
+  if (direction == 'R')
+  {
+    motor.move(0, "stop");
+    delay(1000);
+    arm.reset();
+    motor.move(150, "back");
+    delay(1000);
+  }
+
+  if (direction == 'L')
+  {
+    motor.move(0, "stop");
+    delay(1000);
+    arm.reset();
+    motor.move(150, "back");
+    delay(1000);
+  }
+
+  stepper.moveRelativeInSteps(-20000);
 
   quest += 1;
-  isFront = false;
   isSoi = true;
   delayTurn = 0;
+
+  mode = "END";
 }
 
-String checkQrFromESP32()
-{
-  if (cacheBox1[0] == 'R' && cacheBox1[1] == '1')
-    return "R1";
-  if (cacheBox1[0] == 'R' && cacheBox1[1] == '2')
-    return "R2";
-  if (cacheBox1[0] == 'G' && cacheBox1[1] == '1')
-    return "G1";
-  if (cacheBox1[0] == 'G' && cacheBox1[1] == '2')
-    return "G2";
-  if (cacheBox1[0] == 'B' && cacheBox1[1] == '1')
-    return "B1";
-  if (cacheBox1[0] == 'B' && cacheBox1[1] == '2')
-    return "B2";
-  if (cacheBox1[0] == 'Y' && cacheBox1[1] == '1')
-    return "Y1";
-  if (cacheBox1[0] == 'Y' && cacheBox1[1] == '2')
-    return "Y2";
-}
-
-void first(String _mode)
+void OBJ_LEFT()
 {
   switch (quest)
   {
@@ -352,530 +316,10 @@ void first(String _mode)
     {
       if (sensor.isCenter())
       {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (sensor.s2)
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    motor.move(255, "left");
-    break;
-  case 3:
-    // เดินเช็คแยกจนกว่าจะเจอซอยสุดท้าย
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (currentTime - delayCross > 1200)
-      {
-        if (sensor.s3 || sensor.s4)
-        {
-          soi_count += 1;
-          delayCross = currentTime;
-
-          if (soi_count == 3)
-          {
-            quest += 1;
-            soi_count = 0;
-            delayCross = 0;
-            delayGoToCenter = 0;
-          }
-        }
-      }
-    }
-
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 4:
-    // เลี้ยวขวาซอยสุดท้าย
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s2)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "right");
-    break;
-  case 5:
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-
-      // if (cacheBox1[0] == 'R' || cacheBox1[0] == 'G' || cacheBox1[0] == 'B' || cacheBox1[0] == 'Y')
-      // {
-      //   stepper.moveRelativeInSteps(16000);
-      //   delay(500);
-      //   arm.reset();
-      //   stepper.moveRelativeInSteps(-20000);
-
-      //   quest += 1;
-      //   checkQRBox = false;
-      //   isFront = false;
-      //   delayTurn = 0;
-      // }
-    }
-
-    if (!checkQRBox)
-    {
-      if (sensor.s2)
-        motor.move(155, "front");
-      else if ((sensor.s0) || (sensor.s1))
-        motor.move(100, "left");
-      else if ((sensor.s3) || (sensor.s4))
-        motor.move(100, "right");
-    }
-
-    break;
-  case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1200)
-    {
-      if (sensor.s3 || sensor.s4)
-      {
-        delay(250);
-        quest += 1;
-        isSoi = false;
-        delayGoToCenter = 0;
-      }
-    }
-
-    if (isSoi)
-    {
-      motor.move(255, "back");
-      delay(1000);
-      motor.move(255, "right");
-      delay(1200);
-
-      isFront = true;
-      isSoi = false;
-    }
-    else
-    {
-      if (sensor.s2)
-        motor.move(200, "front");
-      else if ((sensor.s0) || (sensor.s1))
-        motor.move(150, "left");
-      else if ((sensor.s3) || (sensor.s4))
-        motor.move(150, "right");
-    }
-    break;
-  case 7:
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s3 || sensor.s4)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "right");
-    break;
-  case 8:
-    if (sensor.isCenter())
-    {
-      // mode = cacheBox1[0] + cacheBox1[1];
-      mode = _mode;
-      quest = 1;
-    }
-
-    balance_move('\0');
-    break;
-  }
-}
-
-void second(String _mode)
-{
-  switch (quest)
-  {
-  case 1:
-    // เดินจนถึงแยก
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1500)
-    {
-      if (sensor.isCenter())
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (sensor.s2 || sensor.s3)
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    motor.move(255, "left");
-    break;
-  case 3:
-    // เดินเช็คแยกจนกว่าจะเจอซอยสุดท้าย
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (currentTime - delayCross > 1200)
-      {
-        if (sensor.s3 || sensor.s4)
-        {
-          soi_count += 1;
-          delayCross = currentTime;
-
-          if (soi_count == 2)
-          {
-            quest += 1;
-            soi_count = 0;
-            delayCross = 0;
-            delayGoToCenter = 0;
-          }
-        }
-      }
-    }
-
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 4:
-    // เลี้ยวขวาซอยสุดท้าย
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s1 || sensor.s2)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "right");
-    break;
-  case 5:
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-      // if (sensor.s2)
-      // {
-      //   quest += 1;
-      //   isSoi = true;
-      //   isFront = false;
-      //   delayGoToCenter = 0;
-      // }
-    }
-
-    balance_move('\0');
-    break;
-  case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 4250)
-    {
-      if (sensor.s3 || sensor.s4)
-      {
-        delay(250);
-        quest += 1;
-        isSoi = false;
-        delayGoToCenter = 0;
-      }
-    }
-
-    balance_move('R');
-    break;
-  case 7:
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s3 || sensor.s4)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "right");
-    break;
-  case 8:
-    if (sensor.isCenter())
-    {
-      mode = _mode;
-      quest = 1;
-    }
-
-    balance_move('\0');
-    break;
-  }
-}
-
-void third(String _mode)
-{
-  switch (quest)
-  {
-  case 1:
-    // เดินจนถึงแยก
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1500)
-    {
-      if (sensor.isCenter())
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    balance_move('\0');
-    break;
-  case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (sensor.s2 || sensor.s3)
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    motor.move(255, "left");
-    break;
-  case 3:
-    // เดินเช็คแยกจนกว่าจะเจอซอยสุดท้าย
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (currentTime - delayCross > 1200)
-      {
-        if (sensor.s3 || sensor.s4)
-        {
-          soi_count += 1;
-          delayCross = currentTime;
-
-          if (soi_count == 1)
-          {
-            delay(200);
-            quest += 1;
-            soi_count = 0;
-            delayCross = 0;
-            delayGoToCenter = 0;
-          }
-        }
-      }
-    }
-
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 4:
-    // เลี้ยวขวาซอยสุดท้าย
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s1 || sensor.s2)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "right");
-    break;
-  case 5:
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-      // if (sensor.s2)
-      // {
-      //   quest += 1;
-      //   isSoi = true;
-      //   isFront = false;
-      //   delayGoToCenter = 0;
-      // }
-    }
-
-    balance_move('\0');
-    break;
-  case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 4000)
-    {
-      if (sensor.s3 || sensor.s4)
-      {
-        delay(250);
-        quest += 1;
-        isSoi = false;
-        delayGoToCenter = 0;
-      }
-    }
-
-    balance_move('R');
-    break;
-  case 7:
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s3 || sensor.s4)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "right");
-    break;
-  case 8:
-    if (sensor.isCenter())
-    {
-      mode = _mode;
-      quest = 1;
-    }
-
-    balance_move('\0');
-    break;
-  }
-}
-
-void fourth(String _mode)
-{
-  switch (quest)
-  {
-  case 1:
-    // เดินจนถึงแยก
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1500)
-    {
-      if (sensor.isCenter())
-      {
-        delay(200);
+        delay(850);
         quest = 2;
         delayGoToCenter = 0;
       }
-    }
-    balance_move('\0');
-    break;
-  case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 200)
-    {
-      if (sensor.s2 || sensor.s3)
-      {
-        quest = 5;
-        delayGoToCenter = 0;
-      }
-    }
-    motor.move(150, "sleft");
-    break;
-  case 5:
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
     }
 
     if (sensor.s2)
@@ -885,688 +329,51 @@ void fourth(String _mode)
     else if ((sensor.s3) || (sensor.s4))
       motor.move(100, "right");
     break;
-  case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 500)
-    {
-      quest = 7;
-      delayGoToCenter = 0;
-    }
-    motor.move(150, "back");
-    break;
-  case 7:
-    if (sensor.isCenter())
-    {
-      mode = _mode;
-      quest = 1;
-    }
-
-    balance_move('\0');
-    break;
-  }
-}
-
-void fifth(String _mode)
-{
-  switch (quest)
-  {
-  case 1:
-    // เดินจนถึงแยก
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1500)
-    {
-      if (sensor.isCenter())
-      {
-        delay(100);
-        quest = 2;
-        delayGoToCenter = 0;
-      }
-    }
-    balance_move('\0');
-    break;
   case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
+    // slide จนถึงซอยสุดท้าย
     if (delayGoToCenter == 0)
       delayGoToCenter = currentTime;
 
-    if (currentTime - delayGoToCenter > 200)
-    {
-      if (sensor.s2 || sensor.s3)
-      {
-        quest = 3;
-        delayGoToCenter = 0;
-      }
-    }
-    motor.move(150, "sright");
-    break;
-  case 3:
-    // เดินเช็คแยกจนกว่าจะเจอซอยสุดท้าย
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1250)
-    {
-      quest = 4;
-      delayGoToCenter = 0;
-    }
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 4:
-    // เลี้ยวขวาซอยสุดท้าย
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s1 || sensor.s2)
-      {
-        quest = 5;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "left");
-    break;
-  case 5:
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      // if (sensor.isSomeBlack())
-      // {
-      //   motor.move(255, "front");
-      //   delay(300);
-      //   quest = 6;
-      //   delayGoToCenter = 0;
-      // }
-
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-    }
-
-    if (sensor.s2)
-      motor.move(155, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(100, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(100, "right");
-    break;
-  case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 500)
-    {
-      quest = 7;
-      delayGoToCenter = 0;
-    }
-    motor.move(255, "sright");
-    break;
-  case 7:
-    if (sensor.isCenter())
-    {
-      mode = _mode;
-      quest = 1;
-    }
-
-    balance_move('\0');
-    break;
-  }
-}
-
-void sixth(String _mode)
-{
-  switch (quest)
-  {
-  case 1:
-    // เดินจนถึงแยก
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1500)
-    {
-      if (sensor.isCenter())
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    balance_move('\0');
-    break;
-  case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (sensor.s1 || sensor.s2)
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    motor.move(255, "right");
-    break;
-  case 3:
-    // เดินเช็คแยกจนกว่าจะเจอซอยสุดท้าย
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (currentTime - delayCross > 1200)
-      {
-        if (sensor.s0 || sensor.s1)
-        {
-          soi_count += 1;
-          delayCross = currentTime;
-
-          if (soi_count == 1)
-          {
-            delay(200);
-            quest += 1;
-            soi_count = 0;
-            delayCross = 0;
-            delayGoToCenter = 0;
-          }
-        }
-      }
-    }
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 4:
-    // เลี้ยวขวาซอยสุดท้าย
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s1 || sensor.s2)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "left");
-    break;
-  case 5:
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-      // if (sensor.s2)
-      // {
-      //   quest += 1;
-      //   isSoi = true;
-      //   isFront = false;
-      //   delayGoToCenter = 0;
-      // }
-    }
-
-    balance_move('\0');
-    break;
-  case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 4000)
-    {
-      if (sensor.s0 || sensor.s1)
-      {
-        delay(250);
-        quest += 1;
-        isSoi = false;
-        delayGoToCenter = 0;
-      }
-    }
-
-    balance_move('L');
-    break;
-  case 7:
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s0 || sensor.s1)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "left");
-    break;
-  case 8:
-    if (sensor.isCenter())
-    {
-      mode = _mode;
-      quest = 1;
-    }
-
-    balance_move('\0');
-    break;
-  }
-}
-
-void seventh(String _mode)
-{
-  switch (quest)
-  {
-  case 1:
-    // เดินจนถึงแยก
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1500)
-    {
-      if (sensor.isCenter())
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    balance_move('\0');
-    break;
-  case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (sensor.s1 || sensor.s2)
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    motor.move(255, "right");
-    break;
-  case 3:
-    // เดินเช็คแยกจนกว่าจะเจอซอยสุดท้าย
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (currentTime - delayCross > 1200)
-      {
-        if (sensor.s0 || sensor.s1)
-        {
-          soi_count += 1;
-          delayCross = currentTime;
-
-          if (soi_count == 2)
-          {
-            quest += 1;
-            soi_count = 0;
-            delayCross = 0;
-            delayGoToCenter = 0;
-          }
-        }
-      }
-    }
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 4:
-    // เลี้ยวขวาซอยสุดท้าย
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s2 || sensor.s3)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "left");
-    break;
-  case 5:
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      // if (sensor.s2)
-      // {
-      //   quest += 1;
-      //   isSoi = true;
-      //   isFront = false;
-      //   delayGoToCenter = 0;
-      // }
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-    }
-
-    balance_move('\0');
-    break;
-  case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 4250)
-    {
-      if (sensor.s0 || sensor.s1)
-      {
-        delay(250);
-        quest += 1;
-        isSoi = false;
-        delayGoToCenter = 0;
-      }
-    }
-
-    balance_move('L');
-    break;
-  case 7:
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s0 || sensor.s1)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "left");
-    break;
-  case 8:
-    if (sensor.isCenter())
-    {
-      mode = _mode;
-      quest = 1;
-    }
-
-    balance_move('\0');
-    break;
-  }
-}
-
-void eighth(String _mode)
-{
-  switch (quest)
-  {
-  case 1:
-    // เดินจนถึงแยก
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1500)
-    {
-      if (sensor.isCenter())
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (sensor.s1 || sensor.s2)
-      {
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-    motor.move(255, "right");
-    break;
-  case 3:
-    // เดินเช็คแยกจนกว่าจะเจอซอยสุดท้าย
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (currentTime - delayCross > 1200)
-      {
-        if (sensor.s0 || sensor.s1)
-        {
-          soi_count += 1;
-          delayCross = currentTime;
-
-          if (soi_count == 3)
-          {
-            quest += 1;
-            soi_count = 0;
-            delayCross = 0;
-            delayGoToCenter = 0;
-          }
-        }
-      }
-    }
-
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 4:
-    // เลี้ยวขวาซอยสุดท้าย
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s2 || sensor.s3)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(200, "left");
-    break;
-  case 5:
-
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-    }
-
-    if (!checkQRBox)
-    {
-      if (sensor.s2)
-        motor.move(155, "front");
-      else if ((sensor.s0) || (sensor.s1))
-        motor.move(100, "left");
-      else if ((sensor.s3) || (sensor.s4))
-        motor.move(100, "right");
-    }
-    break;
-  case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 4750)
-    {
-      if (sensor.s0 || sensor.s1)
-      {
-        delay(250);
-        quest += 1;
-        delayGoToCenter = 0;
-      }
-    }
-
-    if (isSoi)
-    {
-      motor.move(255, "back");
-      delay(1200);
-      motor.move(255, "left");
-      delay(1000);
-      isSoi = false;
-    }
-
-    motor.move(255, "left");
-    break;
-  case 7:
-    if (delayTurn == 0)
-      delayTurn = currentTime;
-
-    if (currentTime - delayTurn > 1000)
-    {
-      if (sensor.s1 || sensor.s2)
-      {
-        quest += 1;
-        delayTurn = 0;
-      }
-    }
-
-    motor.move(255, "left");
-    break;
-  case 8:
-    if (sensor.isCenter())
-    {
-      mode = _mode;
-      quest = 1;
-    }
-
-    balance_move('\0');
-    break;
-  }
-}
-
-void rightOBJ(String _mode)
-{
-  switch (quest)
-  {
-  case 1:
-    // เดินจนถึงแยก
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 1500)
-    {
-      if (sensor.isCenter())
-      {
-        delay(200);
-        quest = 2;
-        delayGoToCenter = 0;
-      }
-    }
-    if (sensor.s2)
-      motor.move(200, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(150, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(150, "right");
-    break;
-  case 2:
-    // เลี้ยวซ้ายจนเจอเส้น
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
-
-    if (currentTime - delayGoToCenter > 200)
+    if (currentTime - delayGoToCenter > 750)
     {
       if (sensor.s2)
       {
-        quest = 3;
-        delayGoToCenter = 0;
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 4)
+        {
+          quest = 3;
+          soi_count = 0;
+        }
       }
     }
     motor.move(150, "sleft");
     break;
   case 3:
-    // เดินตรง 1 วิ แล้วถอยหลังกลับ
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
+    // เข้าไปหยิบกล่อง
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('R');
 
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('R');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-    }
-
-    if (sensor.s2)
-      motor.move(90, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(55, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(55, "right");
+    gotoSoi();
     break;
   case 4:
     if (delayGoToCenter == 0)
       delayGoToCenter = currentTime;
 
-    if (currentTime - delayGoToCenter > 1500)
+    if (currentTime - delayGoToCenter > 750)
     {
-      if (sensor.isCenter())
-      {
-        motor.move(150, "front");
-        delay(1000);
-        quest = 5;
-        delayGoToCenter = 0;
-      }
+      quest = 5;
+      delayGoToCenter = 0;
     }
     motor.move(150, "back");
     break;
   case 5:
+    // เข้าไปหยิบกล่อง
     if (delayGoToCenter == 0)
       delayGoToCenter = currentTime;
 
-    if (currentTime - delayGoToCenter > 1000)
+    if (currentTime - delayGoToCenter > 750)
     {
       if (sensor.s2)
       {
@@ -1574,40 +381,23 @@ void rightOBJ(String _mode)
         delayGoToCenter = 0;
       }
     }
+
     motor.move(150, "sright");
     break;
   case 6:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('L');
 
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('L');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-    }
-
-    if (sensor.s2)
-      motor.move(90, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(55, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(55, "right");
+    gotoSoi();
     break;
   case 7:
     if (delayGoToCenter == 0)
       delayGoToCenter = currentTime;
 
-    if (currentTime - delayGoToCenter > 1500)
+    if (currentTime - delayGoToCenter > 750)
     {
-      if (sensor.isCenter())
-      {
-        motor.move(150, "front");
-        delay(1000);
-        quest = 8;
-        delayGoToCenter = 0;
-      }
+      quest = 8;
+      delayGoToCenter = 0;
     }
     motor.move(150, "back");
     break;
@@ -1615,7 +405,7 @@ void rightOBJ(String _mode)
     if (delayGoToCenter == 0)
       delayGoToCenter = currentTime;
 
-    if (currentTime - delayGoToCenter > 1000)
+    if (currentTime - delayGoToCenter > 750)
     {
       if (sensor.s2)
       {
@@ -1623,69 +413,46 @@ void rightOBJ(String _mode)
         delayGoToCenter = 0;
       }
     }
+
     motor.move(150, "sright");
     break;
   case 9:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('C');
 
-    if (currentTime - delayGoToCenter > 1000)
-    {
-      if (range > 80 && range < 100 && !checkQRBox)
-        keepOBJ('C');
-      if (!digitalRead(LIMIT_SW_LEFT) && !digitalRead(LIMIT_SW_RIGHT))
-        putOBJ();
-    }
-
-    if (sensor.s2)
-      motor.move(90, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(55, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(55, "right");
+    gotoSoi();
     break;
   case 10:
     if (delayGoToCenter == 0)
       delayGoToCenter = currentTime;
 
-    if (currentTime - delayGoToCenter > 1500)
+    if (currentTime - delayGoToCenter > 750)
     {
-      if (sensor.isCenter())
-      {
-        motor.move(150, "left");
-        delay(3000);
-        quest = 11;
-        delayGoToCenter = 0;
-      }
+      quest = 11;
+      delayGoToCenter = 0;
     }
     motor.move(150, "back");
     break;
   case 11:
-    if (sensor.s1 || sensor.s2)
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
     {
-      quest = 12;
-      delayGoToCenter = 0;
+      if (sensor.s2)
+      {
+        delay(300);
+        quest = 12;
+        delayGoToCenter = 0;
+      }
     }
     motor.move(150, "sright");
     break;
   case 12:
-    if (delayGoToCenter == 0)
-      delayGoToCenter = currentTime;
+    if (sensor.isCenter())
+      quest = 13;
 
-    if (currentTime - delayGoToCenter > 500)
-    {
-      if (sensor.s0 || sensor.s1)
-      {
-        quest = 13;
-        delayGoToCenter = 0;
-      }
-    }
-    if (sensor.s2)
-      motor.move(150, "front");
-    else if ((sensor.s0) || (sensor.s1))
-      motor.move(100, "left");
-    else if ((sensor.s3) || (sensor.s4))
-      motor.move(100, "right");
+    motor.move(150, "back");
     break;
   case 13:
     if (delayGoToCenter == 0)
@@ -1693,23 +460,26 @@ void rightOBJ(String _mode)
 
     if (currentTime - delayGoToCenter > 1500)
     {
-      if (sensor.s2)
+      if (sensor.s1 || sensor.s2)
       {
         quest = 14;
         delayGoToCenter = 0;
       }
     }
-
     motor.move(150, "left");
     break;
   case 14:
     if (delayGoToCenter == 0)
       delayGoToCenter = currentTime;
 
-    if (currentTime - delayGoToCenter > 1000)
+    if (currentTime - delayGoToCenter > 500)
     {
       if (sensor.isCenter())
-        quest = 15;
+      {
+        quest = 1;
+        mode = "PUTOBJ";
+        delayGoToCenter = 0;
+      }
     }
 
     if (sensor.s2)
@@ -1719,18 +489,1149 @@ void rightOBJ(String _mode)
     else if ((sensor.s3) || (sensor.s4))
       motor.move(100, "right");
     break;
-  case 15:
-    if (sensor.isCenter())
+  }
+}
+
+void OBJ_LEFT_2()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
     {
-      delay(2000);
-      mode = "END";
+      if (sensor.isCenter())
+      {
+        delay(850);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
     }
+
     if (sensor.s2)
       motor.move(150, "front");
     else if ((sensor.s0) || (sensor.s1))
       motor.move(100, "left");
     else if ((sensor.s3) || (sensor.s4))
       motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      quest = 3;
+    }
+    motor.move(150, "sleft");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (range > 80 && range < 100 && !checkQRBox)
+    {
+      keepOBJ('C');
+      motor.move(150, "sright");
+      delay(500);
+    }
+
+    gotoSoi();
+    break;
+  case 4:
+    if (sensor.isCenter())
+      quest = 5;
+
+    motor.move(150, "back");
+    break;
+
+  case 5:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.s2)
+      {
+        quest = 6;
+        delayGoToCenter = 0;
+      }
+    }
+    motor.move(150, "right");
+    break;
+  case 6:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.isCenter())
+      {
+        quest = 1;
+        mode = "END_TEST";
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  }
+}
+
+void OBJ_RIGHT_3RIHGT()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(500);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 600)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 4)
+        {
+          quest = 3;
+          soi_count = 0;
+        }
+      }
+    }
+    motor.move(150, "sright");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('R');
+
+    gotoSoi();
+    break;
+  case 4:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      quest = 5;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "back");
+    break;
+  case 5:
+    // เข้าไปหยิบกล่อง
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      if (sensor.s2)
+      {
+        quest = 6;
+        delayGoToCenter = 0;
+      }
+    }
+
+    motor.move(150, "sleft");
+    break;
+  case 6:
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('L');
+
+    gotoSoi();
+    break;
+  case 7:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      quest = 8;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "back");
+    break;
+  case 8:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      if (sensor.s2)
+      {
+        quest = 9;
+        delayGoToCenter = 0;
+      }
+    }
+
+    motor.move(150, "sleft");
+    break;
+  case 9:
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('C');
+
+    gotoSoi();
+    break;
+  case 10:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      quest = 11;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "back");
+    break;
+  case 11:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      if (sensor.s2)
+      {
+        delay(300);
+        quest = 12;
+        delayGoToCenter = 0;
+      }
+    }
+    motor.move(150, "sleft");
+    break;
+  case 12:
+    if (sensor.isCenter())
+      quest = 13;
+
+    motor.move(150, "back");
+    break;
+  case 13:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.s1 || sensor.s2)
+      {
+        quest = 14;
+        delayGoToCenter = 0;
+      }
+    }
+    motor.move(150, "right");
+    break;
+  case 14:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.isCenter())
+      {
+        quest = 1;
+        mode = "PUT_TEST";
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  }
+}
+
+void OBJ_RIGHT_3CENTER()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(650);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        quest = 3;
+        delayGoToCenter = currentTime;
+      }
+    }
+    motor.move(150, "sright");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('C');
+
+    gotoSoi();
+    break;
+  case 4:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      quest = 12;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "sleft");
+    break;
+  case 5:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        quest = 13;
+        delayGoToCenter = 0;
+      }
+    }
+
+    motor.move(150, "sright");
+    break;
+  case 6:
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('L');
+
+    gotoSoi();
+    break;
+  case 7:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      quest = 8;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "back");
+    break;
+  case 8:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      if (sensor.s2)
+      {
+        quest = 9;
+        delayGoToCenter = 0;
+      }
+    }
+
+    motor.move(150, "sleft");
+    break;
+  case 9:
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('C');
+
+    gotoSoi();
+    break;
+  case 10:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      quest = 11;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "back");
+    break;
+  case 11:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      if (sensor.s2)
+      {
+        delay(300);
+        quest = 12;
+        delayGoToCenter = 0;
+      }
+    }
+    motor.move(150, "sright");
+    break;
+  case 12:
+    if (sensor.isCenter())
+      quest = 13;
+
+    motor.move(150, "back");
+    break;
+  case 13:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.s1 || sensor.s2)
+      {
+        quest = 14;
+        delayGoToCenter = 0;
+      }
+    }
+    motor.move(150, "right");
+    break;
+  case 14:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.isCenter())
+      {
+        quest = 1;
+        mode = "END_TEST";
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  }
+}
+
+void OBJ_RIGHT_2LEFT()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 600)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 4)
+        {
+          quest = 3;
+          soi_count = 0;
+        }
+      }
+    }
+    motor.move(150, "sleft");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('R');
+
+    gotoSoi();
+    break;
+  case 4:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      quest = 5;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "back");
+    break;
+  case 5:
+    // เข้าไปหยิบกล่อง
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      if (sensor.s2)
+      {
+        quest = 6;
+        delayGoToCenter = 0;
+      }
+    }
+
+    motor.move(150, "sright");
+    break;
+  case 6:
+    if (range > 80 && range < 100 && !checkQRBox)
+      keepOBJ('L');
+
+    gotoSoi();
+    break;
+  case 7:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      quest = 8;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "back");
+    break;
+  case 8:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      if (sensor.s2)
+      {
+        delay(300);
+        quest = 9;
+        delayGoToCenter = 0;
+      }
+    }
+    motor.move(150, "sright");
+    break;
+  case 9:
+    if (sensor.isCenter())
+      quest = 10;
+
+    motor.move(150, "back");
+    break;
+  case 10:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.s1 || sensor.s2)
+      {
+        quest = 11;
+        delayGoToCenter = 0;
+      }
+    }
+    motor.move(150, "left");
+    break;
+  case 11:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.isCenter())
+      {
+        quest = 1;
+        mode = "PUTOBJ";
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  }
+}
+
+void putOBJ_Test()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        quest = 3;
+        delayGoToCenter = currentTime;
+      }
+    }
+    motor.move(150, "sleft");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ('C');
+
+    gotoSoi();
+    break;
+  case 4:
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 750)
+    {
+      quest = 5;
+      delayGoToCenter = 0;
+    }
+    motor.move(150, "back");
+    break;
+  }
+}
+
+void putOBJ_LEFT_Y2()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 4)
+          quest = 3;
+      }
+    }
+    motor.move(150, "sleft");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ(' ');
+
+    gotoSoi();
+    break;
+  case 4:
+    quest = 1;
+    mode == "END";
+    break;
+  }
+}
+
+void putOBJ_LEFT_B2()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 3)
+          quest = 3;
+      }
+    }
+    motor.move(150, "sleft");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ(' ');
+
+    gotoSoi();
+    break;
+  case 4:
+    quest = 1;
+    mode == "END";
+    break;
+  }
+}
+
+void putOBJ_LEFT_G2()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 2)
+          quest = 3;
+      }
+    }
+    motor.move(150, "sleft");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ(' ');
+
+    gotoSoi();
+    break;
+  case 4:
+    quest = 1;
+    mode == "END";
+    break;
+  }
+}
+
+void putOBJ_LEFT_R2()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 2)
+          quest = 3;
+      }
+    }
+    motor.move(150, "sleft");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ(' ');
+
+    gotoSoi();
+    break;
+  case 4:
+    quest = 1;
+    mode == "END";
+    break;
+  }
+}
+
+void putOBJ_LEFT_R1()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        quest = 3;
+        delayGoToCenter = currentTime;
+      }
+    }
+    motor.move(150, "sright");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ(' ');
+
+    gotoSoi();
+    break;
+  case 4:
+    quest = 1;
+    mode == "END";
+    break;
+  }
+}
+
+void putOBJ_LEFT_G1()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 2)
+          quest = 3;
+      }
+    }
+    motor.move(150, "sright");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ(' ');
+
+    gotoSoi();
+    break;
+  case 4:
+    quest = 1;
+    mode == "END";
+    break;
+  }
+}
+
+void putOBJ_LEFT_B1()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 3;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 3)
+          quest = 3;
+      }
+    }
+    motor.move(150, "sright");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ(' ');
+
+    gotoSoi();
+    break;
+  case 4:
+    quest = 1;
+    mode == "END";
+    break;
+  }
+}
+
+void putOBJ_LEFT_Y1()
+{
+  switch (quest)
+  {
+  case 1:
+    // เดินจนถึงแยก
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 1500)
+    {
+      if (sensor.isCenter())
+      {
+        delay(950);
+        quest = 2;
+        delayGoToCenter = 0;
+      }
+    }
+
+    if (sensor.s2)
+      motor.move(150, "front");
+    else if ((sensor.s0) || (sensor.s1))
+      motor.move(100, "left");
+    else if ((sensor.s3) || (sensor.s4))
+      motor.move(100, "right");
+    break;
+  case 2:
+    // slide จนถึงซอยสุดท้าย
+    if (delayGoToCenter == 0)
+      delayGoToCenter = currentTime;
+
+    if (currentTime - delayGoToCenter > 500)
+    {
+      if (sensor.s2)
+      {
+        soi_count += 1;
+        delayGoToCenter = currentTime;
+
+        if (soi_count == 4)
+          quest = 3;
+      }
+    }
+    motor.move(150, "sright");
+    break;
+  case 3:
+    // เข้าไปหยิบกล่อง
+    if (digitalRead(LIMIT_SW) == 0)
+      putOBJ(' ');
+
+    gotoSoi();
+    break;
+  case 4:
+    quest = 1;
+    mode == "END";
     break;
   }
 }
@@ -1776,49 +1677,20 @@ void ModeP1_OBJ_LEFT()
 
   // เก็บกล่อง
   if (mode == "OBJ")
-  {
-    // if (!isOBJ_FINISH_TO_RIGHT[0])
-    //   first("");
-    // else if (!isOBJ_FINISH_TO_RIGHT[1])
-    //   second("");
-    // else if (!isOBJ_FINISH_TO_RIGHT[2])
-    //   third("");
-    if (!isOBJ_FINISH_TO_RIGHT[3])
-      fourth("");
-    else if (!isOBJ_FINISH_TO_RIGHT[4])
-      fifth("");
-    else if (!isOBJ_FINISH_TO_RIGHT[5])
-      sixth("");
-    else if (!isOBJ_FINISH_TO_RIGHT[6])
-      seventh("");
-    else if (!isOBJ_FINISH_TO_RIGHT[7])
-      eighth("");
-  }
+    OBJ_LEFT();
 
-  // วางกล่อง
-  if (mode == "Y1")
-    first("OBJ");
-  if (mode == "B1")
-    second("OBJ");
-  if (mode == "G1")
-    third("OBJ");
-  if (mode == "R1")
-    fourth("OBJ");
-  if (mode == "R2")
-    fifth("OBJ");
-  if (mode == "G2")
-    sixth("OBJ");
-  if (mode == "B2")
-    seventh("OBJ");
-  if (mode == "Y2")
-    eighth("OBJ");
+  if (mode == "PUTOBJ")
+    putOBJ_Test();
+  // putOBJ_RIGHT();
+
+  if (mode == "END")
+    motor.move(0, "stop");
 }
 
-void ModeP1_OBJ_RIGHT()
+void ModeP2_OBJ_RIGHT()
 {
   status = green;
-  pMode = "P1 OR";
-
+  pMode = "P2 OR";
   if (mode == "GTCT")
     gotoCenter();
   if (mode == "CT_CROSS")
@@ -1826,110 +1698,77 @@ void ModeP1_OBJ_RIGHT()
 
   // เก็บกล่อง
   if (mode == "OBJ")
-  {
-    if (!isOBJ_FINISH_TO_LEFT[0])
-      eighth("Y2");
-    else if (!isOBJ_FINISH_TO_LEFT[1])
-      seventh("B2");
-    else if (!isOBJ_FINISH_TO_LEFT[2])
-      sixth("G2");
-    else if (!isOBJ_FINISH_TO_LEFT[3])
-      fifth("R2");
-    else if (!isOBJ_FINISH_TO_LEFT[4])
-      fourth("R1");
-    else if (!isOBJ_FINISH_TO_LEFT[5])
-      third("G1");
-    else if (!isOBJ_FINISH_TO_LEFT[6])
-      second("B1");
-    else if (!isOBJ_FINISH_TO_LEFT[7])
-      first("Y1");
-  }
+    OBJ_RIGHT_3RIHGT();
+  if (mode == "OBJ_2")
+    OBJ_RIGHT_3CENTER();
+  if (mode == "OBJ_3")
+    OBJ_RIGHT_2LEFT();
+
+  // วางของรอบแรก
+  if (mode == "PUT_TEST")
+    putOBJ_Test();
 
   // วางกล่อง
   if (mode == "Y2")
-    first("OBJ");
-  if (mode == "B2")
-    second("OBJ");
-  if (mode == "G2")
-    third("OBJ");
-  if (mode == "R2")
-    fourth("OBJ");
-  if (mode == "R1")
-    fifth("OBJ");
-  if (mode == "G1")
-    sixth("OBJ");
+    putOBJ_LEFT_Y2();
   if (mode == "B1")
-    seventh("OBJ");
+    putOBJ_LEFT_B2();
+  if (mode == "G2")
+    putOBJ_LEFT_G2();
+  if (mode == "R2")
+    putOBJ_LEFT_R2();
+  if (mode == "R1")
+    putOBJ_LEFT_R1();
+  if (mode == "G1")
+    putOBJ_LEFT_G1();
+  if (mode == "B1")
+    putOBJ_LEFT_B1();
   if (mode == "Y1")
-    eighth("OBJ");
-}
+    putOBJ_LEFT_Y1();
 
-void ModeP2()
-{
-  status = green;
-  pMode = "P2";
-
-  if (mode == "GTCT")
-    gotoCenter();
-  if (mode == "CT_CROSS")
-    gotoOBJ('L');
-
-  if (mode == "OBJ")
-    rightOBJ("");
+  if (mode == "END")
+    motor.move(0, "stop");
 }
 
 void ModeP3()
 {
   status = green;
   pMode = "P3";
-
   if (mode == "GTCT")
     gotoCenter();
   if (mode == "CT_CROSS")
+    gotoOBJ('R');
+
+  if (mode == "OBJ")
+    OBJ_RIGHT_3CENTER();
+
+  if (mode == "END_TEST")
+  {
+    motor.move(255, "front");
+    delay(1000);
     motor.move(0, "stop");
-
-  // arm.move("arm", 90);
-  // arm.move("hand", 180);
-  // delay(1000);
-  // stepper.moveRelativeInSteps(12000);
-  // delay(1000);
-  // arm.move("arm", 20);
-  // delay(500);
-  // arm.move("hand", 0);
-  // delay(1000);
-  // // หลังจากวางเสร็จ
-
-  // // Reset แขน
-  // stepper.moveRelativeInSteps(16000);
-  // delay(500);
-  // arm.move("arm", 90);
-  // stepper.moveRelativeInSteps(-32000);
-  // delay(2000);
-
-  // // เอากล่องจาก stock
-  // stepper.moveRelativeInSteps(32000);
-  // delay(1000);
-  // arm.move("arm", 20);
-  // arm.move("hand", 0);
-  // delay(500);
-  // stepper.moveRelativeInSteps(-16000);
-  // delay(500);
-  // arm.move("hand", 180);
-  // delay(500);
-  // stepper.moveRelativeInSteps(16000);
-  // delay(500);
-  // arm.move("arm", 90);
-  // delay(1500);
-  // arm.move("hand", 0);
-  // delay(2000);
-  // stepper.moveRelativeInSteps(-16000);
-  // delay(2000);
+  }
 }
 
 void ModeP4()
 {
   status = green;
   pMode = "P4";
+  if (mode == "GTCT")
+    gotoCenter();
+  if (mode == "CT_CROSS")
+    gotoOBJ('L');
+
+  if (mode == "OBJ")
+    OBJ_LEFT_2();
+
+  if (mode == "END_TEST")
+  {
+    motor.move(255, "front");
+    delay(1000);
+    motor.move(0, "stop");
+    mode = "";
+  }
 }
 
 void setup()
@@ -1961,10 +1800,7 @@ void setup()
   pinMode(LED_SENSOR_A3, OUTPUT);
   pinMode(LED_SENSOR_A4, OUTPUT);
 
-  pinMode(46, OUTPUT);
-
-  pinMode(LIMIT_SW_LEFT, INPUT_PULLUP);
-  pinMode(LIMIT_SW_RIGHT, INPUT_PULLUP);
+  pinMode(LIMIT_SW, INPUT_PULLUP);
 
   digitalWrite(LED_STATUS_RED, LOW);
   digitalWrite(LED_STATUS_YELLOW, HIGH);
@@ -1972,33 +1808,16 @@ void setup()
 
   if (!digitalRead(MODE_P1) && digitalRead(MODE_P2) && digitalRead(MODE_P3) && digitalRead(MODE_P4))
     for (uint8_t i = 0; i < 8; i++)
-      isOBJ_FINISH_TO_RIGHT[i] = EEPROM.read(i);
+      putOBJ_RIGHT[i] = EEPROM.read(i);
 
   if (digitalRead(MODE_P1) && !digitalRead(MODE_P2) && !digitalRead(MODE_P3) && !digitalRead(MODE_P4))
     for (uint8_t i = 0; i < 8; i++)
-      isOBJ_FINISH_TO_LEFT[i] = EEPROM.read(i);
-
-  for (uint8_t i = 3; i >= 1; i--)
-  {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.println("Hello World!");
-    display.println("Robot By EN CMTC");
-    display.println("");
-    display.print("Start Robot in: ");
-    display.println(i);
-    display.setCursor(0, 0);
-    display.display();
-    delay(1000);
-  }
+      putOBJ_LEFT[i] = EEPROM.read(i);
 
   stepper.setSpeedInMillimetersPerSecond(1000000.0f);
   stepper.setAccelerationInStepsPerSecondPerSecond(1000000.0f);
 
-  if (digitalRead(MODE_P3))
-    stepper.moveRelativeInSteps(22500);
+  stepper.moveRelativeInSteps(22500);
 
   if (!lox.begin())
   {
@@ -2017,19 +1836,7 @@ void loop()
   if (Serial1.available() > 0)
     Serial1.readBytes(buf, 2);
 
-  if (buf[0] == 'R' || buf[0] == 'G' || buf[0] == 'B' || buf[0] == 'Y')
-  {
-    if (buf != cacheBox1)
-    {
-      cacheBox1[0] = buf[0];
-      cacheBox1[1] = buf[1];
-      qrCodeLight = false;
-    }
-  }
-
-  // qr code light
-  digitalWrite(46, qrCodeLight);
-
+  // set stepper motor speed
   stepper.setSpeedInMillimetersPerSecond(1000000.0f);
   stepper.setAccelerationInStepsPerSecondPerSecond(1000000.0f);
 
@@ -2055,11 +1862,11 @@ void loop()
   else
     range = 0;
 
-  // if Robot have error
+  // if robot have error
   if (mode == "error")
     status = red;
 
-  // Emergency Button
+  // Emergency button
   if (emergencyBTN)
     status = yellow;
 
@@ -2101,13 +1908,9 @@ void loop()
     if (!digitalRead(MODE_P1) && digitalRead(MODE_P2) && digitalRead(MODE_P3) && digitalRead(MODE_P4))
       ModeP1_OBJ_LEFT();
 
-    // P1 Mode RIGHT (Switch OFF)
-    if (digitalRead(MODE_P1) && !digitalRead(MODE_P2) && !digitalRead(MODE_P3) && !digitalRead(MODE_P4))
-      ModeP1_OBJ_RIGHT();
-
     // P2 Mode (Switch ON)
     if (digitalRead(MODE_P1) && !digitalRead(MODE_P2) && digitalRead(MODE_P3) && digitalRead(MODE_P4))
-      ModeP2();
+      ModeP2_OBJ_RIGHT();
 
     // P3 Mode (Switch ON)
     if (digitalRead(MODE_P1) && digitalRead(MODE_P2) && !digitalRead(MODE_P3) && digitalRead(MODE_P4))
@@ -2122,7 +1925,7 @@ void loop()
     {
       status = red;
       mode = "";
-      pMode = "None";
+      pMode = "Default None";
       motor.move(0, "stop");
     }
   }
@@ -2144,18 +1947,23 @@ void loop()
     Log Function
 
   */
+
+  digitalWrite(LED_SENSOR_A0, digitalRead(LIMIT_SW));
   if (currentTime - delayLog > 250)
   {
     sensor.log();
 
     // Serial.print("mode: ");
     // Serial.println(mode);
-    Serial.print("distance: ");
-    Serial.println(range);
+    // Serial.print("distance: ");
+    // Serial.println(range);
 
     // Serial.print("buf: ");
     // Serial.print(buf[0]);
     // Serial.println(buf[1]);
+
+    Serial.print("LIMIT_SW : ");
+    Serial.println(digitalRead(LIMIT_SW));
 
     Serial.println(" ");
     Serial.println(" ");

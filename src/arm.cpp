@@ -36,25 +36,25 @@ void Arm::getObj()
 
 void Arm::keepObjLeft()
 {
-    delay(1000);
+    delay(500);
     this->arm.write(20);
     delay(1000);
     this->hand.write(0);
-    delay(1000);
+    delay(500);
 }
 
 void Arm::keepObjRight()
 {
-    delay(1000);
+    delay(500);
     this->arm.write(160);
     delay(1000);
     this->hand.write(0);
-    delay(1000);
+    delay(500);
 }
 
 void Arm::centerArm()
 {
-    this->arm.write(100);
+    this->arm.write(90);
     delay(1000);
     this->hand.write(0);
     delay(1000);
